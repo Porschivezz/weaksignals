@@ -1,0 +1,151 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: weaksignals-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-weaksignals}
+      POSTGRES_USER: ${POSTGRES_USER:-weaksignals}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-weaksignals} -d ${POSTGRES_DB:-weaksignals}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - weaksignals-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: weaksignals-redis
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - weaksignals-net
+
+  neo4j:
+    image: neo4j:5-community
+    container_name: weaksignals-neo4j
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD}
+      NEO4J_PLUGINS: '["graph-data-science"]'
+    volumes:
+      - neo4j_data:/data
+    networks:
+      - weaksignals-net
+
+  backend:
+    build:
+      context: ./backend
+    container_name: weaksignals-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      neo4j:
+        condition: service_started
+    env_file:
+      - .env.prod
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4
+    networks:
+      - weaksignals-net
+
+  celery-worker:
+    build:
+      context: ./backend
+    container_name: weaksignals-celery-worker
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      neo4j:
+        condition: service_started
+    env_file:
+      - .env.prod
+    command: celery -A app.workers.celery_app worker -l info -c 2
+    networks:
+      - weaksignals-net
+
+  celery-beat:
+    build:
+      context: ./backend
+    container_name: weaksignals-celery-beat
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      neo4j:
+        condition: service_started
+    env_file:
+      - .env.prod
+    command: celery -A app.workers.celery_app beat -l info
+    networks:
+      - weaksignals-net
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        - NEXT_PUBLIC_API_URL=https://ws.huginnmuninn.tech/api/v1
+    container_name: weaksignals-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      - NEXT_PUBLIC_API_URL=https://ws.huginnmuninn.tech/api/v1
+    networks:
+      - weaksignals-net
+
+  nginx:
+    image: nginx:alpine
+    container_name: weaksignals-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - backend
+      - frontend
+    volumes:
+      - ./nginx/nginx.prod.conf:/etc/nginx/nginx.conf:ro
+      - certbot_webroot:/var/www/certbot:ro
+      - certbot_certs:/etc/letsencrypt:ro
+    networks:
+      - weaksignals-net
+
+  certbot:
+    image: certbot/certbot
+    container_name: weaksignals-certbot
+    volumes:
+      - certbot_webroot:/var/www/certbot
+      - certbot_certs:/etc/letsencrypt
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+
+networks:
+  weaksignals-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  neo4j_data:
+  redis_data:
+  certbot_webroot:
+  certbot_certs:

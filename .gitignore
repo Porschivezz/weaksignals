@@ -20,7 +20,9 @@ htmlcov/
 
 # Environment
 .env
+.env.prod
 !.env.example
+!.env.prod.example
 
 # Node.js
 node_modules/
