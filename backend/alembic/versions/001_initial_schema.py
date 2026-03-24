@@ -63,12 +63,9 @@ def upgrade() -> None:
         sa.Column("institutions", postgresql.JSONB(), nullable=True),
         sa.Column("published_date", sa.DateTime(timezone=True), nullable=True),
         sa.Column("ingested_at", sa.DateTime(timezone=True), server_default=sa.func.now()),
-        sa.Column("embedding", sa.Column("embedding", sa.LargeBinary()), nullable=True),
         sa.Column("metadata", postgresql.JSONB(), nullable=True),
         sa.Column("processed", sa.Boolean(), server_default="false"),
     )
-    # Replace the generic embedding column with pgvector
-    op.execute("ALTER TABLE documents DROP COLUMN IF EXISTS embedding")
     op.execute("ALTER TABLE documents ADD COLUMN embedding vector(1024)")
     op.create_index("ix_documents_tenant_id", "documents", ["tenant_id"])
     op.create_index("ix_documents_external_id", "documents", ["external_id"])

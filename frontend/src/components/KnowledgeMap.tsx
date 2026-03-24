@@ -4,12 +4,19 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import * as d3 from "d3";
 import type { GraphNode, GraphEdge } from "@/lib/types";
 
+export interface KnowledgeMapZoomControls {
+  zoomIn: () => void;
+  zoomOut: () => void;
+  resetZoom: () => void;
+}
+
 interface KnowledgeMapProps {
   nodes?: GraphNode[];
   edges?: GraphEdge[];
   width?: number;
   height?: number;
   onNodeClick?: (node: GraphNode) => void;
+  onZoomControlsReady?: (controls: KnowledgeMapZoomControls) => void;
 }
 
 const MOCK_NODES: GraphNode[] = [
@@ -86,6 +93,7 @@ export default function KnowledgeMap({
   width: propWidth,
   height: propHeight,
   onNodeClick,
+  onZoomControlsReady,
 }: KnowledgeMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -135,6 +143,14 @@ export default function KnowledgeMap({
       });
 
     svg.call(zoom);
+
+    if (onZoomControlsReady) {
+      onZoomControlsReady({
+        zoomIn: () => svg.transition().duration(300).call(zoom.scaleBy, 1.5),
+        zoomOut: () => svg.transition().duration(300).call(zoom.scaleBy, 0.67),
+        resetZoom: () => svg.transition().duration(300).call(zoom.transform, d3.zoomIdentity),
+      });
+    }
 
     const simulation = d3
       .forceSimulation(simNodes)

@@ -222,11 +222,34 @@ export default function DigestPage() {
             )}
           </div>
 
-          <button className="btn-secondary">
+          <button
+            className="btn-secondary"
+            onClick={() => {
+              const text = `Intelligence Digest: ${format(startDate, "MMM d")} - ${format(endDate, "MMM d, yyyy")}\n\n${summary}\n\nSignals:\n${signals.map((s, i) => `${i + 1}. ${s.signal.title} (Score: ${(s.signal.composite_score * 100).toFixed(0)}%)`).join("\n")}`;
+              const blob = new Blob([text], { type: "text/plain" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = `digest-${format(endDate, "yyyy-MM-dd")}.txt`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+          >
             <Download className="w-4 h-4 mr-2" />
             Export
           </button>
-          <button className="btn-primary">
+          <button
+            className="btn-primary"
+            onClick={async () => {
+              const text = `Intelligence Digest: ${format(startDate, "MMM d")} - ${format(endDate, "MMM d, yyyy")}\n\n${summary}`;
+              if (navigator.share) {
+                await navigator.share({ title: "Intelligence Digest", text });
+              } else {
+                await navigator.clipboard.writeText(text);
+                alert("Digest copied to clipboard");
+              }
+            }}
+          >
             <Share2 className="w-4 h-4 mr-2" />
             Share
           </button>
@@ -313,11 +336,34 @@ export default function DigestPage() {
           Digest generated on {format(new Date(), "MMMM d, yyyy 'at' h:mm a")}
         </p>
         <div className="flex gap-2">
-          <button className="btn-secondary text-xs">
+          <button
+            className="btn-secondary text-xs"
+            onClick={() => {
+              const text = `Intelligence Digest: ${format(startDate, "MMM d")} - ${format(endDate, "MMM d, yyyy")}\n\n${summary}\n\nSignals:\n${signals.map((s, i) => `${i + 1}. ${s.signal.title} (Score: ${(s.signal.composite_score * 100).toFixed(0)}%)`).join("\n")}`;
+              const blob = new Blob([text], { type: "text/plain" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = `digest-${format(endDate, "yyyy-MM-dd")}.txt`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+          >
             <Download className="w-3 h-3 mr-1" />
             Download PDF
           </button>
-          <button className="btn-primary text-xs">
+          <button
+            className="btn-primary text-xs"
+            onClick={async () => {
+              const text = `Intelligence Digest: ${format(startDate, "MMM d")} - ${format(endDate, "MMM d, yyyy")}\n\n${summary}`;
+              if (navigator.share) {
+                await navigator.share({ title: "Intelligence Digest", text });
+              } else {
+                await navigator.clipboard.writeText(text);
+                alert("Digest copied to clipboard");
+              }
+            }}
+          >
             <Share2 className="w-3 h-3 mr-1" />
             Share with Team
           </button>

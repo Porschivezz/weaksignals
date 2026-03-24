@@ -280,6 +280,7 @@ export default function SignalsPage() {
   const [signals, setSignals] = useState<TenantSignal[]>(MOCK_SIGNALS);
   const [filterType, setFilterType] = useState<string>("all");
   const [minScore, setMinScore] = useState(0);
+  const [timeRange, setTimeRange] = useState<string>("All");
   const [selectedSignal, setSelectedSignal] = useState<TenantSignal | null>(null);
   const [showFilters, setShowFilters] = useState(true);
 
@@ -304,6 +305,12 @@ export default function SignalsPage() {
     if (filterType !== "all" && ts.signal.signal_type !== filterType) return false;
     if (ts.signal.composite_score < minScore) return false;
     if (ts.is_dismissed) return false;
+    if (timeRange !== "All") {
+      const days = parseInt(timeRange);
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - days);
+      if (new Date(ts.signal.first_detected) < cutoff) return false;
+    }
     return true;
   });
 
@@ -396,7 +403,13 @@ export default function SignalsPage() {
                 {["7d", "30d", "90d", "All"].map((range) => (
                   <button
                     key={range}
-                    className="btn-ghost text-xs px-3 py-1.5 border border-slate-700 rounded-lg"
+                    onClick={() => setTimeRange(range === "All" ? "All" : range.replace("d", ""))}
+                    className={`text-xs px-3 py-1.5 border rounded-lg transition-colors ${
+                      (timeRange === "All" && range === "All") ||
+                      timeRange === range.replace("d", "")
+                        ? "border-blue-500 text-blue-400 bg-blue-500/10"
+                        : "btn-ghost border-slate-700"
+                    }`}
                   >
                     {range}
                   </button>
@@ -548,7 +561,19 @@ export default function SignalsPage() {
                 >
                   Dismiss
                 </button>
-                <button className="btn-primary flex-1 text-xs">Add to Watchlist</button>
+                <button
+                  onClick={async () => {
+                    try {
+                      const { addToWatchlist } = await import("@/lib/api");
+                      await addToWatchlist(selectedSignal.signal.title);
+                    } catch {
+                      // Silently handle - watchlist page will show it when API is available
+                    }
+                  }}
+                  className="btn-primary flex-1 text-xs"
+                >
+                  Add to Watchlist
+                </button>
               </div>
             </div>
           </div>

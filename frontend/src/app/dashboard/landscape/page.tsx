@@ -1,14 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Search, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
 import type { GraphNode, LandscapeData } from "@/lib/types";
 import { getLandscape } from "@/lib/api";
 import KnowledgeMap from "@/components/KnowledgeMap";
+import type { KnowledgeMapZoomControls } from "@/components/KnowledgeMap";
 
 export default function LandscapePage() {
   const [landscapeData, setLandscapeData] = useState<LandscapeData | null>(null);
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
+  const [zoomControls, setZoomControls] = useState<KnowledgeMapZoomControls | null>(null);
 
   useEffect(() => {
     async function fetchLandscape() {
@@ -35,13 +37,13 @@ export default function LandscapePage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button className="btn-ghost">
+          <button className="btn-ghost" onClick={() => zoomControls?.zoomIn()}>
             <ZoomIn className="w-4 h-4" />
           </button>
-          <button className="btn-ghost">
+          <button className="btn-ghost" onClick={() => zoomControls?.zoomOut()}>
             <ZoomOut className="w-4 h-4" />
           </button>
-          <button className="btn-ghost">
+          <button className="btn-ghost" onClick={() => zoomControls?.resetZoom()}>
             <Maximize2 className="w-4 h-4" />
           </button>
         </div>
@@ -53,6 +55,7 @@ export default function LandscapePage() {
           nodes={landscapeData?.nodes}
           edges={landscapeData?.edges}
           onNodeClick={(node) => setSelectedNode(node)}
+          onZoomControlsReady={setZoomControls}
         />
       </div>
 
