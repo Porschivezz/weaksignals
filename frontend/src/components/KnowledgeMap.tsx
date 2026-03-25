@@ -183,7 +183,7 @@ export default function KnowledgeMap({
       .style("cursor", "pointer")
       .call(
         d3
-          .drag<SVGGElement, SimNode>()
+          .drag<SVGGElement, SimNode>() as any
           .on("start", (event, d) => {
             if (!event.active) simulation.alphaTarget(0.3).restart();
             d.fx = d.x;
