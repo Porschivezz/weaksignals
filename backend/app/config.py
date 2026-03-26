@@ -11,6 +11,8 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = ""
     COHERE_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
+    OPENROUTER_API_KEY: str = ""
+    OPENROUTER_MODEL: str = "google/gemini-2.0-flash-001"
     JWT_SECRET: str = "change-me-in-production-please"
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRATION: int = 86400  # 24 hours

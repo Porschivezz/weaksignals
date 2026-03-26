@@ -1,9 +1,7 @@
-"""Gemini-powered signal analysis for weak signal detection.
+"""LLM-powered signal analysis for weak signal detection.
 
-Uses Google Gemini API for:
-- Entity extraction from pharma/biotech documents
-- Signal classification and scoring
-- Weekly digest generation
+Uses OpenRouter API (OpenAI-compatible) when OPENROUTER_API_KEY is set.
+Falls back to direct Google Gemini API otherwise.
 """
 
 import json
@@ -14,6 +12,7 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
+OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
 
 PHARMA_CLUSTERS = {
@@ -48,15 +47,23 @@ SYSTEM_PROMPT = """Ты — аналитик слабых сигналов дл�
 
 
 class GeminiAnalyzer:
-    """Analyze documents and generate signals using Google Gemini API."""
+    """Analyze documents and generate signals using LLM via OpenRouter or Gemini API."""
 
-    def __init__(self, api_key: str):
-        self.api_key = api_key
+    def __init__(self, api_key: str, openrouter_api_key: str = "", openrouter_model: str = "google/gemini-2.0-flash-001"):
+        self.gemini_api_key = api_key
+        self.openrouter_api_key = openrouter_api_key
+        self.openrouter_model = openrouter_model
+        self.use_openrouter = bool(openrouter_api_key)
         self._client: httpx.AsyncClient | None = None
+
+        if self.use_openrouter:
+            logger.info("Using OpenRouter API with model: %s", openrouter_model)
+        else:
+            logger.info("Using direct Gemini API")
 
     async def _get_client(self) -> httpx.AsyncClient:
         if self._client is None or self._client.is_closed:
-            self._client = httpx.AsyncClient(timeout=60.0)
+            self._client = httpx.AsyncClient(timeout=120.0)
         return self._client
 
     async def close(self) -> None:
@@ -64,10 +71,66 @@ class GeminiAnalyzer:
             await self._client.aclose()
             self._client = None
 
-    async def _call_gemini(self, prompt: str) -> dict | None:
-        """Call Gemini API and return parsed JSON response."""
+    async def _call_llm(self, prompt: str) -> dict | None:
+        """Call LLM via OpenRouter (preferred) or Gemini API."""
+        if self.use_openrouter:
+            return await self._call_openrouter(prompt)
+        return await self._call_gemini(prompt)
+
+    async def _call_openrouter(self, prompt: str) -> dict | None:
+        """Call OpenRouter API (OpenAI-compatible)."""
         client = await self._get_client()
-        url = f"{GEMINI_API_URL}?key={self.api_key}"
+
+        payload = {
+            "model": self.openrouter_model,
+            "messages": [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+            "temperature": 0.2,
+            "max_tokens": 4096,
+            "response_format": {"type": "json_object"},
+        }
+
+        headers = {
+            "Authorization": f"Bearer {self.openrouter_api_key}",
+            "Content-Type": "application/json",
+            "HTTP-Referer": "https://ws.huginnmuninn.tech",
+            "X-Title": "WeakSignals Pharmasyntez",
+        }
+
+        try:
+            resp = await client.post(OPENROUTER_API_URL, json=payload, headers=headers)
+            resp.raise_for_status()
+            data = resp.json()
+
+            text = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+            if not text:
+                logger.warning("OpenRouter returned empty response")
+                return None
+
+            text = text.strip()
+            if text.startswith("```"):
+                text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+                if text.endswith("```"):
+                    text = text[:-3]
+                text = text.strip()
+
+            return json.loads(text)
+        except httpx.HTTPStatusError as exc:
+            logger.error("OpenRouter HTTP error: %s — %s", exc.response.status_code, exc.response.text[:500])
+            return None
+        except json.JSONDecodeError as exc:
+            logger.error("OpenRouter JSON parse error: %s", exc)
+            return None
+        except Exception as exc:
+            logger.error("OpenRouter call failed: %s", exc)
+            return None
+
+    async def _call_gemini(self, prompt: str) -> dict | None:
+        """Call Gemini API directly (fallback)."""
+        client = await self._get_client()
+        url = f"{GEMINI_API_URL}?key={self.gemini_api_key}"
 
         payload = {
             "contents": [
@@ -99,7 +162,6 @@ class GeminiAnalyzer:
             if not text:
                 return None
 
-            # Parse JSON, handle markdown fences
             text = text.strip()
             if text.startswith("```"):
                 text = text.split("\n", 1)[1] if "\n" in text else text[3:]
@@ -119,18 +181,10 @@ class GeminiAnalyzer:
             return None
 
     async def analyze_documents(self, documents: list[dict]) -> list[dict]:
-        """Analyze a batch of documents and extract signals.
-
-        Args:
-            documents: List of dicts with 'title', 'abstract', 'source' fields.
-
-        Returns:
-            List of signal dicts with title, description, cluster, scores, entities.
-        """
+        """Analyze a batch of documents and extract signals."""
         if not documents:
             return []
 
-        # Prepare document summaries for Gemini (batch up to 15 docs)
         doc_texts = []
         for i, doc in enumerate(documents[:15]):
             source = doc.get("source", "unknown")
@@ -172,12 +226,12 @@ class GeminiAnalyzer:
 - Если документы не содержат сигналов — верни пустой массив
 - Не придумывай сигналы, которых нет в документах"""
 
-        result = await self._call_gemini(prompt)
+        result = await self._call_llm(prompt)
         if result is None:
             return []
 
         signals = result.get("signals", [])
-        logger.info("Gemini extracted %d signals from %d documents", len(signals), len(documents))
+        logger.info("LLM extracted %d signals from %d documents", len(signals), len(documents))
         return signals
 
     async def generate_weekly_digest(
@@ -186,16 +240,7 @@ class GeminiAnalyzer:
         period_start: str,
         period_end: str,
     ) -> dict | None:
-        """Generate a weekly executive digest from top signals.
-
-        Args:
-            signals: List of signal dicts (title, description, scores, cluster).
-            period_start: ISO date string.
-            period_end: ISO date string.
-
-        Returns:
-            Digest dict with summary, key_insights, recommendations.
-        """
+        """Generate a weekly executive digest from top signals."""
         if not signals:
             return None
 
@@ -237,7 +282,7 @@ class GeminiAnalyzer:
 
 Пиши профессиональным бизнес-языком на русском. Фокус — на actionable insights для CEO."""
 
-        result = await self._call_gemini(prompt)
+        result = await self._call_llm(prompt)
         if result:
             logger.info("Generated weekly digest for %s — %s", period_start, period_end)
         return result
@@ -260,4 +305,4 @@ class GeminiAnalyzer:
   "recommended_actions": ["действие1", "действие2"]
 }}"""
 
-        return await self._call_gemini(prompt)
+        return await self._call_llm(prompt)

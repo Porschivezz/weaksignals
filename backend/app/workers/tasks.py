@@ -290,9 +290,9 @@ def analyze_and_score_task(self) -> dict:
     """Analyze unprocessed documents with Gemini and create/update signals."""
     logger.info("=== Starting analysis and scoring pipeline ===")
 
-    if not settings.GEMINI_API_KEY:
-        logger.warning("GEMINI_API_KEY not set, skipping analysis")
-        return {"error": "GEMINI_API_KEY not configured"}
+    if not settings.GEMINI_API_KEY and not settings.OPENROUTER_API_KEY:
+        logger.warning("No LLM API key set (GEMINI_API_KEY or OPENROUTER_API_KEY), skipping analysis")
+        return {"error": "No LLM API key configured"}
 
     session = _get_sync_session()
 
@@ -314,7 +314,11 @@ def analyze_and_score_task(self) -> dict:
         from app.services.nlp.gemini_analyzer import GeminiAnalyzer
 
         async def process_analysis(docs_list):
-            analyzer = GeminiAnalyzer(api_key=settings.GEMINI_API_KEY)
+            analyzer = GeminiAnalyzer(
+                api_key=settings.GEMINI_API_KEY,
+                openrouter_api_key=settings.OPENROUTER_API_KEY,
+                openrouter_model=settings.OPENROUTER_MODEL,
+            )
             try:
                 all_sig = []
                 batch_size = 15
