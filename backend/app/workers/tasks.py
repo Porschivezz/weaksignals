@@ -157,7 +157,6 @@ def _store_documents(session: Session, works: list[dict], source: DocumentSource
         session.commit()
     return new_docs
 
-
 @celery_app.task(name="app.workers.tasks.ingest_all_sources_task", bind=True, max_retries=2)
 def ingest_all_sources_task(self) -> dict:
     """Ingest from all data sources: PubMed, OpenAlex, ClinicalTrials.gov, arXiv, RSS."""
@@ -169,12 +168,17 @@ def ingest_all_sources_task(self) -> dict:
         # 1. PubMed
         try:
             from app.services.ingestion.pubmed import PubMedClient
-            pubmed = PubMedClient(email=settings.PUBMED_EMAIL)
-            all_pubmed = []
-            for query in PUBMED_QUERIES:
-                docs = asyncio.run(pubmed.search_and_fetch(query, max_results=20, days_back=30))
-                all_pubmed.extend(docs)
-            asyncio.run(pubmed.close())
+            async def fetch_pubmed():
+                client = PubMedClient(email=settings.PUBMED_EMAIL)
+                try:
+                    docs = []
+                    for query in PUBMED_QUERIES:
+                        docs.extend(await client.search_and_fetch(query, max_results=20, days_back=30))
+                    return docs
+                finally:
+                    await client.close()
+
+            all_pubmed = asyncio.run(fetch_pubmed())
             new_docs = _store_documents(session, all_pubmed, DocumentSource.pubmed)
             results["pubmed"] = len(new_docs)
             logger.info("PubMed: %d new documents (from %d fetched)", len(new_docs), len(all_pubmed))
@@ -184,23 +188,28 @@ def ingest_all_sources_task(self) -> dict:
         # 2. OpenAlex
         try:
             from app.services.ingestion.openalex import OpenAlexClient
-            openalex = OpenAlexClient(email=settings.OPENALEX_EMAIL)
-            all_openalex = []
-            openalex_queries = [
-                "AI drug discovery pharmaceutical",
-                "biosimilar monoclonal antibody",
-                "CAR-T immunotherapy",
-                "mRNA cancer vaccine",
-                "antibody drug conjugate",
-            ]
-            for query in openalex_queries:
-                docs = asyncio.run(openalex.fetch_recent_works(
-                    query=query, per_page=25,
-                    from_date=datetime.now(timezone.utc) - timedelta(days=30),
-                    max_pages=2,
-                ))
-                all_openalex.extend(docs)
-            asyncio.run(openalex.close())
+            async def fetch_openalex():
+                client = OpenAlexClient(email=settings.OPENALEX_EMAIL)
+                try:
+                    docs = []
+                    openalex_queries = [
+                        "AI drug discovery pharmaceutical",
+                        "biosimilar monoclonal antibody",
+                        "CAR-T immunotherapy",
+                        "mRNA cancer vaccine",
+                        "antibody drug conjugate",
+                    ]
+                    for query in openalex_queries:
+                        docs.extend(await client.fetch_recent_works(
+                            query=query, per_page=25,
+                            from_date=datetime.now(timezone.utc) - timedelta(days=30),
+                            max_pages=2,
+                        ))
+                    return docs
+                finally:
+                    await client.close()
+
+            all_openalex = asyncio.run(fetch_openalex())
             new_docs = _store_documents(session, all_openalex, DocumentSource.openalex)
             results["openalex"] = len(new_docs)
             logger.info("OpenAlex: %d new documents (from %d fetched)", len(new_docs), len(all_openalex))
@@ -210,12 +219,17 @@ def ingest_all_sources_task(self) -> dict:
         # 3. ClinicalTrials.gov
         try:
             from app.services.ingestion.clinicaltrials import ClinicalTrialsClient
-            ct = ClinicalTrialsClient()
-            all_ct = []
-            for query in CT_QUERIES:
-                docs = asyncio.run(ct.search_studies(query, max_results=15, days_back=60))
-                all_ct.extend(docs)
-            asyncio.run(ct.close())
+            async def fetch_ct():
+                client = ClinicalTrialsClient()
+                try:
+                    docs = []
+                    for query in CT_QUERIES:
+                        docs.extend(await client.search_studies(query, max_results=15, days_back=60))
+                    return docs
+                finally:
+                    await client.close()
+
+            all_ct = asyncio.run(fetch_ct())
             new_docs = _store_documents(session, all_ct, DocumentSource.clinicaltrials)
             results["clinicaltrials"] = len(new_docs)
             logger.info("ClinicalTrials: %d new documents (from %d fetched)", len(new_docs), len(all_ct))
@@ -225,12 +239,17 @@ def ingest_all_sources_task(self) -> dict:
         # 4. arXiv
         try:
             from app.services.ingestion.arxiv import ArxivClient
-            arxiv = ArxivClient()
-            all_arxiv = []
-            for cat in ARXIV_CATEGORIES:
-                docs = asyncio.run(arxiv.fetch_recent_papers(category=cat, max_results=30))
-                all_arxiv.extend(docs)
-            asyncio.run(arxiv.close())
+            async def fetch_arxiv():
+                client = ArxivClient()
+                try:
+                    docs = []
+                    for cat in ARXIV_CATEGORIES:
+                        docs.extend(await client.fetch_recent_papers(category=cat, max_results=30))
+                    return docs
+                finally:
+                    await client.close()
+
+            all_arxiv = asyncio.run(fetch_arxiv())
             new_docs = _store_documents(session, all_arxiv, DocumentSource.arxiv)
             results["arxiv"] = len(new_docs)
             logger.info("arXiv: %d new documents (from %d fetched)", len(new_docs), len(all_arxiv))
@@ -240,9 +259,14 @@ def ingest_all_sources_task(self) -> dict:
         # 5. RSS Feeds
         try:
             from app.services.ingestion.rss_feeds import RSSFeedClient
-            rss = RSSFeedClient()
-            all_rss = asyncio.run(rss.fetch_all_feeds())
-            asyncio.run(rss.close())
+            async def fetch_rss():
+                client = RSSFeedClient()
+                try:
+                    return await client.fetch_all_feeds()
+                finally:
+                    await client.close()
+
+            all_rss = asyncio.run(fetch_rss())
             new_docs = _store_documents(session, all_rss, DocumentSource.rss)
             results["rss"] = len(new_docs)
             logger.info("RSS: %d new documents (from %d fetched)", len(new_docs), len(all_rss))
@@ -287,36 +311,39 @@ def analyze_and_score_task(self) -> dict:
 
         logger.info("Analyzing %d unprocessed documents", len(unprocessed))
 
-        # Process in batches of 15
         from app.services.nlp.gemini_analyzer import GeminiAnalyzer
-        analyzer = GeminiAnalyzer(api_key=settings.GEMINI_API_KEY)
 
-        all_signals = []
-        batch_size = 15
-
-        for i in range(0, len(unprocessed), batch_size):
-            batch = unprocessed[i:i + batch_size]
-            doc_dicts = [
-                {
-                    "title": d.title,
-                    "abstract": d.abstract or "",
-                    "source": d.source.value if d.source else "unknown",
-                }
-                for d in batch
-            ]
-
+        async def process_analysis(docs_list):
+            analyzer = GeminiAnalyzer(api_key=settings.GEMINI_API_KEY)
             try:
-                signals = asyncio.run(analyzer.analyze_documents(doc_dicts))
-                all_signals.extend(signals)
-            except Exception as exc:
-                logger.error("Gemini analysis failed for batch %d: %s", i, exc)
+                all_sig = []
+                batch_size = 15
+                for i in range(0, len(docs_list), batch_size):
+                    batch = docs_list[i:i + batch_size]
+                    doc_dicts = [
+                        {
+                            "title": d.title,
+                            "abstract": d.abstract or "",
+                            "source": d.source.value if d.source else "unknown",
+                        }
+                        for d in batch
+                    ]
+                    try:
+                        signals = await analyzer.analyze_documents(doc_dicts)
+                        all_sig.extend(signals)
+                    except Exception as exc:
+                        logger.error("Gemini analysis failed for batch %d: %s", i, exc)
+                return all_sig
+            finally:
+                await analyzer.close()
 
-            # Mark as processed
-            for doc in batch:
-                doc.processed = True
-            session.commit()
+        # Run analysis entirely in one loop
+        all_signals = asyncio.run(process_analysis(unprocessed))
 
-        asyncio.run(analyzer.close())
+        # Mark as processed
+        for doc in unprocessed:
+            doc.processed = True
+        session.commit()
 
         # Create/update Signal records
         signals_created = 0
@@ -410,7 +437,6 @@ def analyze_and_score_task(self) -> dict:
         raise
     finally:
         session.close()
-
 
 @celery_app.task(name="app.workers.tasks.compute_tenant_relevance_task")
 def compute_tenant_relevance_task() -> dict:

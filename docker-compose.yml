@@ -23,6 +23,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: weaksignals-redis
+    command: redis-server --requirepass wS_pr0d_Rd_2026nBq7
     ports:
       - "6379:6379"
     volumes:
@@ -105,7 +106,7 @@ services:
       - COHERE_API_KEY=${COHERE_API_KEY:-}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
-    command: celery -A app.workers.celery_app worker -l info -c 2
+    command: celery -A app.workers.celery_app worker -l info --pool=solo
     volumes:
       - ./backend:/app
     networks:
