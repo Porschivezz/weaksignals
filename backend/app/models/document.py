@@ -14,6 +14,9 @@ class DocumentSource(str, enum.Enum):
     openalex = "openalex"
     arxiv = "arxiv"
     semantic_scholar = "semantic_scholar"
+    pubmed = "pubmed"
+    clinicaltrials = "clinicaltrials"
+    rss = "rss"
 
 
 class Document(Base):
@@ -29,7 +32,8 @@ class Document(Base):
         String(512), unique=True, nullable=True
     )
     source: Mapped[DocumentSource] = mapped_column(
-        Enum(DocumentSource), nullable=False
+        Enum(DocumentSource, name="documentsource", create_constraint=False),
+        nullable=False,
     )
     title: Mapped[str] = mapped_column(Text, nullable=False)
     abstract: Mapped[str | None] = mapped_column(Text, nullable=True)

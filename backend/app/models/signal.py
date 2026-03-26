@@ -39,6 +39,7 @@ class Signal(Base):
     )
     title: Mapped[str] = mapped_column(String(512), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cluster: Mapped[str | None] = mapped_column(String(64), nullable=True)
     signal_type: Mapped[SignalType] = mapped_column(
         Enum(SignalType), nullable=False
     )

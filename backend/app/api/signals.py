@@ -23,6 +23,7 @@ router = APIRouter(prefix="/signals", tags=["signals"])
 @router.get("", response_model=list[TenantSignalResponse])
 async def list_signals(
     category: SignalType | None = Query(None, description="Filter by signal type"),
+    cluster: str | None = Query(None, description="Filter by cluster (ai_drug_discovery, oncology, etc.)"),
     min_score: float = Query(0.0, ge=0.0, le=1.0, description="Minimum composite score"),
     time_range: str | None = Query(
         None,
@@ -44,12 +45,22 @@ async def list_signals(
         )
     )
 
+    joined = False
     if category is not None:
-        stmt = stmt.join(Signal).where(Signal.signal_type == category)
+        stmt = stmt.join(Signal)
+        stmt = stmt.where(Signal.signal_type == category)
+        joined = True
+
+    if cluster is not None:
+        if not joined:
+            stmt = stmt.join(Signal)
+            joined = True
+        stmt = stmt.where(Signal.cluster == cluster)
 
     if min_score > 0.0:
-        if category is None:
+        if not joined:
             stmt = stmt.join(Signal)
+            joined = True
         stmt = stmt.where(Signal.composite_score >= min_score)
 
     if time_range is not None:

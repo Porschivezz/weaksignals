@@ -1,83 +1,18 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { AlertTriangle, TrendingUp, Radio, Zap, Bell } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { AlertTriangle, TrendingUp, Radio, Bell, RefreshCw } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
-
-interface AlertItem {
-  id: string;
-  timestamp: string;
-  type: "weak_signal" | "emerging_trend" | "strong_signal" | "system";
-  title: string;
-  description: string;
-  read?: boolean;
-}
+import { ru } from "date-fns/locale";
+import type { TenantSignal } from "@/lib/types";
+import { getSignals } from "@/lib/api";
+import { CLUSTER_NAMES, SIGNAL_TYPE_LABELS } from "@/lib/types";
 
 interface AlertFeedProps {
-  alerts?: AlertItem[];
   maxItems?: number;
 }
 
-const MOCK_ALERTS: AlertItem[] = [
-  {
-    id: "a1",
-    timestamp: new Date(Date.now() - 12 * 60000).toISOString(),
-    type: "strong_signal",
-    title: "Surge in enterprise AI agent adoption",
-    description: "Multiple Fortune 500 companies announced AI agent deployment roadmaps this week, indicating accelerated market shift.",
-    read: false,
-  },
-  {
-    id: "a2",
-    timestamp: new Date(Date.now() - 45 * 60000).toISOString(),
-    type: "emerging_trend",
-    title: "Open-weight model performance parity",
-    description: "Latest benchmarks show open-weight models closing gap with proprietary offerings across reasoning tasks.",
-    read: false,
-  },
-  {
-    id: "a3",
-    timestamp: new Date(Date.now() - 2 * 3600000).toISOString(),
-    type: "weak_signal",
-    title: "Novel hardware architecture for inference",
-    description: "Research papers from two independent groups describe photonic computing approaches for transformer inference.",
-    read: true,
-  },
-  {
-    id: "a4",
-    timestamp: new Date(Date.now() - 5 * 3600000).toISOString(),
-    type: "emerging_trend",
-    title: "Regulatory framework convergence",
-    description: "EU AI Act implementation timelines align with emerging US executive order requirements, creating unified compliance landscape.",
-    read: true,
-  },
-  {
-    id: "a5",
-    timestamp: new Date(Date.now() - 8 * 3600000).toISOString(),
-    type: "weak_signal",
-    title: "Decentralized training protocols gaining traction",
-    description: "Three new startups funded this month working on distributed model training across heterogeneous compute.",
-    read: true,
-  },
-  {
-    id: "a6",
-    timestamp: new Date(Date.now() - 14 * 3600000).toISOString(),
-    type: "system",
-    title: "Weekly intelligence digest generated",
-    description: "Your personalized weak signals digest for this week is now available for review.",
-    read: true,
-  },
-  {
-    id: "a7",
-    timestamp: new Date(Date.now() - 22 * 3600000).toISOString(),
-    type: "strong_signal",
-    title: "Major cloud provider launches model marketplace",
-    description: "AWS announced general availability of its fine-tuned model marketplace, changing distribution dynamics.",
-    read: true,
-  },
-];
-
-const typeConfig = {
+const typeConfig: Record<string, { icon: typeof Radio; color: string; bg: string; border: string }> = {
   weak_signal: {
     icon: Radio,
     color: "text-amber-400",
@@ -96,24 +31,32 @@ const typeConfig = {
     bg: "bg-red-500/10",
     border: "border-red-500/20",
   },
-  system: {
-    icon: Zap,
+  noise: {
+    icon: Radio,
     color: "text-slate-400",
     bg: "bg-slate-500/10",
     border: "border-slate-500/20",
   },
 };
 
-export default function AlertFeed({ alerts: propAlerts, maxItems = 10 }: AlertFeedProps) {
+export default function AlertFeed({ maxItems = 10 }: AlertFeedProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const alerts = (propAlerts || MOCK_ALERTS).slice(0, maxItems);
-  const unreadCount = alerts.filter((a) => !a.read).length;
+  const [signals, setSignals] = useState<TenantSignal[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = 0;
+    async function fetch() {
+      try {
+        const data = await getSignals({ limit: maxItems });
+        setSignals(data);
+      } catch {
+        // No data available
+      } finally {
+        setLoading(false);
+      }
     }
-  }, [alerts]);
+    fetch();
+  }, [maxItems]);
 
   return (
     <div className="flex flex-col h-full">
@@ -121,55 +64,59 @@ export default function AlertFeed({ alerts: propAlerts, maxItems = 10 }: AlertFe
       <div className="flex items-center justify-between mb-4 shrink-0">
         <div className="flex items-center gap-2">
           <Bell className="w-4 h-4 text-slate-400" />
-          <h3 className="text-sm font-semibold text-slate-200">Alert Feed</h3>
+          <h3 className="text-sm font-semibold text-slate-200">Последние сигналы</h3>
         </div>
-        {unreadCount > 0 && (
-          <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-500/15 text-blue-400 border border-blue-500/25">
-            {unreadCount} new
-          </span>
-        )}
+        <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-500/15 text-blue-400 border border-blue-500/25">
+          {signals.length} активных
+        </span>
       </div>
 
       {/* Feed */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-2 pr-1">
-        {alerts.map((alert) => {
-          const config = typeConfig[alert.type];
-          const Icon = config.icon;
-          return (
-            <div
-              key={alert.id}
-              className={`flex gap-3 p-3 rounded-lg border transition-all duration-200 cursor-pointer hover:bg-slate-800/40 ${
-                alert.read
-                  ? "border-slate-800/50 bg-transparent"
-                  : `${config.border} ${config.bg}`
-              }`}
-            >
-              <div className={`shrink-0 mt-0.5 ${config.color}`}>
-                <Icon className="w-4 h-4" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2">
-                  <h4
-                    className={`text-xs font-medium leading-tight ${
-                      alert.read ? "text-slate-400" : "text-slate-200"
-                    }`}
-                  >
-                    {alert.title}
-                  </h4>
-                  {!alert.read && (
-                    <div className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0 mt-1" />
-                  )}
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <RefreshCw className="w-5 h-5 text-slate-500 animate-spin" />
+          </div>
+        ) : signals.length === 0 ? (
+          <p className="text-xs text-slate-500 text-center py-8">Нет активных сигналов</p>
+        ) : (
+          signals.map((ts) => {
+            const config = typeConfig[ts.signal.signal_type] || typeConfig.noise;
+            const Icon = config.icon;
+            const clusterName = ts.signal.cluster
+              ? CLUSTER_NAMES[ts.signal.cluster] || ts.signal.cluster
+              : null;
+            return (
+              <div
+                key={ts.signal.id}
+                className={`flex gap-3 p-3 rounded-lg border transition-all duration-200 cursor-pointer hover:bg-slate-800/40 ${config.border} ${config.bg}`}
+              >
+                <div className={`shrink-0 mt-0.5 ${config.color}`}>
+                  <Icon className="w-4 h-4" />
                 </div>
-                <p className="text-[11px] text-slate-500 mt-1 line-clamp-2 leading-relaxed">
-                  {alert.description}
-                </p>
-                <p className="text-[10px] text-slate-600 mt-1.5">
-                  {formatDistanceToNow(new Date(alert.timestamp), { addSuffix: true })}
-                </p>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <h4 className="text-xs font-medium leading-tight text-slate-200">
+                      {ts.signal.title}
+                    </h4>
+                    <span className="text-xs font-bold text-slate-400 tabular-nums shrink-0">
+                      {(ts.signal.composite_score * 100).toFixed(0)}
+                    </span>
+                  </div>
+                  {clusterName && (
+                    <p className="text-[10px] text-slate-500 mt-0.5">{clusterName}</p>
+                  )}
+                  <p className="text-[10px] text-slate-600 mt-1">
+                    {formatDistanceToNow(new Date(ts.signal.first_detected), {
+                      addSuffix: true,
+                      locale: ru,
+                    })}
+                  </p>
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
     </div>
   );

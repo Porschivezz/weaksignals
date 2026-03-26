@@ -28,49 +28,20 @@ celery_app.conf.update(
     task_soft_time_limit=1800,
     task_time_limit=3600,
     result_expires=86400,
+    broker_connection_retry_on_startup=True,
 )
 
 celery_app.conf.beat_schedule = {
-    "ingest-openalex": {
-        "task": "app.workers.tasks.ingest_openalex_task",
+    "ingest-all-sources": {
+        "task": "app.workers.tasks.ingest_all_sources_task",
         "schedule": crontab(minute=0, hour="*/6"),
-        "args": (),
-        "options": {"queue": "ingestion"},
     },
-    "ingest-arxiv": {
-        "task": "app.workers.tasks.ingest_arxiv_task",
-        "schedule": crontab(minute=0, hour="*/4"),
-        "args": (),
-        "options": {"queue": "ingestion"},
-    },
-    "detect-novelty": {
-        "task": "app.workers.tasks.detect_novelty_task",
-        "schedule": crontab(minute=0, hour=2),
-        "args": (),
-        "options": {"queue": "detection"},
-    },
-    "compute-momentum": {
-        "task": "app.workers.tasks.compute_momentum_task",
-        "schedule": crontab(minute=0, hour=3, day_of_week=1),
-        "args": (),
-        "options": {"queue": "detection"},
-    },
-    "detect-communities": {
-        "task": "app.workers.tasks.detect_communities_task",
-        "schedule": crontab(minute=0, hour=4, day_of_week=1),
-        "args": (),
-        "options": {"queue": "detection"},
-    },
-    "score-signals": {
-        "task": "app.workers.tasks.score_signals_task",
-        "schedule": crontab(minute=0, hour=5, day_of_week=1),
-        "args": (),
-        "options": {"queue": "detection"},
+    "analyze-and-score": {
+        "task": "app.workers.tasks.analyze_and_score_task",
+        "schedule": crontab(minute=30, hour="*/6"),
     },
     "compute-tenant-relevance": {
         "task": "app.workers.tasks.compute_tenant_relevance_task",
-        "schedule": crontab(minute=0, hour=6, day_of_week=1),
-        "args": (),
-        "options": {"queue": "detection"},
+        "schedule": crontab(minute=0, hour=3),
     },
 }

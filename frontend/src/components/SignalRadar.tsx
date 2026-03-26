@@ -35,31 +35,31 @@ export default function SignalRadar({ signals, onSignalClick }: SignalRadarProps
 
   const radarData = [
     {
-      axis: "Novelty",
+      axis: "Новизна",
       ...Object.fromEntries(
         displaySignals.map((s, i) => [`signal_${i}`, s.signal.novelty_score * 100])
       ),
     },
     {
-      axis: "Momentum",
+      axis: "Импульс",
       ...Object.fromEntries(
         displaySignals.map((s, i) => [`signal_${i}`, s.signal.momentum_score * 100])
       ),
     },
     {
-      axis: "Relevance",
+      axis: "Релевантность",
       ...Object.fromEntries(
         displaySignals.map((s, i) => [`signal_${i}`, s.relevance_score * 100])
       ),
     },
     {
-      axis: "Competition",
+      axis: "Конкуренция",
       ...Object.fromEntries(
         displaySignals.map((s, i) => [`signal_${i}`, s.competitor_activity * 100])
       ),
     },
     {
-      axis: "Opportunity",
+      axis: "Возможности",
       ...Object.fromEntries(
         displaySignals.map((s, i) => [`signal_${i}`, s.opportunity_score * 100])
       ),

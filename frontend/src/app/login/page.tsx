@@ -25,7 +25,7 @@ export default function LoginPage() {
       Cookies.set("user", JSON.stringify(data.user), { expires: 7 });
       router.push("/dashboard");
     } catch {
-      setError("Invalid credentials. Please try again.");
+      setError("Неверные учетные данные. Попробуйте снова.");
     } finally {
       setLoading(false);
     }
@@ -50,7 +50,7 @@ export default function LoginPage() {
             Huginn & Muninn
           </h1>
           <p className="text-slate-400 text-sm">
-            Weak Signals Intelligence Platform
+            Платформа мониторинга слабых сигналов
           </p>
         </div>
 
@@ -70,7 +70,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="input-field"
-                placeholder="you@company.com"
+                placeholder="user@pharmasyntez.com"
                 required
               />
             </div>
@@ -80,7 +80,7 @@ export default function LoginPage() {
                 htmlFor="password"
                 className="block text-sm font-medium text-slate-300 mb-1.5"
               >
-                Password
+                Пароль
               </label>
               <div className="relative">
                 <input
@@ -89,7 +89,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="input-field pr-10"
-                  placeholder="Enter your password"
+                  placeholder="Введите пароль"
                   required
                 />
                 <button
@@ -120,17 +120,17 @@ export default function LoginPage() {
               {loading ? (
                 <span className="flex items-center gap-2">
                   <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Signing in...
+                  Вход...
                 </span>
               ) : (
-                "Sign In"
+                "Войти"
               )}
             </button>
           </form>
         </div>
 
         <p className="text-center text-slate-600 text-xs mt-8">
-          Strategic intelligence for forward-thinking leaders
+          Стратегическая разведка для принятия решений
         </p>
       </div>
     </div>

@@ -128,7 +128,7 @@ class SignalScorer:
         self,
         signal: dict,
         tenant_config: dict,
-        embeddings_service: object,
+        embeddings_service: object = None,
     ) -> TenantRelevanceScore:
         """Compute tenant-specific relevance for a signal.
 

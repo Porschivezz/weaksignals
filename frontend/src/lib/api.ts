@@ -1,7 +1,6 @@
 import axios from "axios";
 import Cookies from "js-cookie";
 import type {
-  Signal,
   TenantSignal,
   SignalTrajectoryPoint,
   LandscapeData,
@@ -50,8 +49,10 @@ export async function login(
 }
 
 export async function getSignals(params?: {
-  signal_type?: string;
+  category?: string;
+  cluster?: string;
   min_score?: number;
+  time_range?: string;
   limit?: number;
   offset?: number;
 }): Promise<TenantSignal[]> {
@@ -76,11 +77,8 @@ export async function getLandscape(): Promise<LandscapeData> {
   return response.data;
 }
 
-export async function getDigest(params?: {
-  start_date?: string;
-  end_date?: string;
-}): Promise<WeeklyDigest> {
-  const response = await api.get("/digest", { params });
+export async function getWeeklyDigest(top_n?: number): Promise<WeeklyDigest> {
+  const response = await api.get("/digest/weekly", { params: top_n ? { top_n } : {} });
   return response.data;
 }
 
@@ -110,6 +108,16 @@ export async function updateTenant(
   data: Partial<Pick<Tenant, "industry_verticals" | "technology_watchlist">>
 ): Promise<Tenant> {
   const response = await api.patch("/tenant", data);
+  return response.data;
+}
+
+export async function triggerIngestion(): Promise<{ status: string; task_id: string; message: string }> {
+  const response = await api.post("/pipeline/trigger-ingestion");
+  return response.data;
+}
+
+export async function triggerAnalysis(): Promise<{ status: string; task_id: string; message: string }> {
+  const response = await api.post("/pipeline/trigger-analysis");
   return response.data;
 }
 

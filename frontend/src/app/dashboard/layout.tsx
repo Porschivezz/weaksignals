@@ -27,10 +27,10 @@ export default function DashboardLayout({
       try {
         setUser(JSON.parse(userCookie));
       } catch {
-        setUser({ id: "1", email: "ceo@acme.com", full_name: "Alex Morgan", role: "admin" });
+        setUser({ id: "1", email: "ceo@pharmasyntez.com", full_name: "Пользователь", role: "ceo" });
       }
     } else {
-      setUser({ id: "1", email: "ceo@acme.com", full_name: "Alex Morgan", role: "admin" });
+      setUser({ id: "1", email: "ceo@pharmasyntez.com", full_name: "Пользователь", role: "ceo" });
     }
 
     setLoading(false);
@@ -41,7 +41,7 @@ export default function DashboardLayout({
       <div className="flex items-center justify-center min-h-screen bg-slate-950">
         <div className="flex flex-col items-center gap-4">
           <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <p className="text-slate-400 text-sm">Loading dashboard...</p>
+          <p className="text-slate-400 text-sm">Загрузка...</p>
         </div>
       </div>
     );
@@ -50,8 +50,9 @@ export default function DashboardLayout({
   return (
     <div className="min-h-screen bg-slate-950">
       <Sidebar
-        tenantName="Acme Corp"
-        userName={user?.full_name || "User"}
+        tenantName="ГК Фармасинтез"
+        userName={user?.full_name || "Пользователь"}
+        userRole={user?.role || "user"}
       />
       <main className="pl-60 min-h-screen">
         <div className="p-8">{children}</div>

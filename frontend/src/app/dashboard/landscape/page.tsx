@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { Search, ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ZoomIn, ZoomOut, Maximize2 } from "lucide-react";
 import type { GraphNode, LandscapeData } from "@/lib/types";
 import { getLandscape } from "@/lib/api";
 import KnowledgeMap from "@/components/KnowledgeMap";
@@ -31,9 +31,9 @@ export default function LandscapePage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Knowledge Landscape</h1>
+          <h1 className="text-2xl font-bold text-white">Ландшафт знаний</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Interactive map of AI technology concepts, relationships, and emerging clusters
+            Интерактивная карта технологических концепций, связей и кластеров
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -60,25 +60,21 @@ export default function LandscapePage() {
       </div>
 
       {/* Info bar */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="card-compact text-center">
-          <p className="text-2xl font-bold text-white">20</p>
-          <p className="text-xs text-slate-500 mt-1">Technology Concepts</p>
+          <p className="text-2xl font-bold text-white">{landscapeData?.nodes.length || 0}</p>
+          <p className="text-xs text-slate-500 mt-1">Концепций</p>
         </div>
         <div className="card-compact text-center">
-          <p className="text-2xl font-bold text-white">21</p>
-          <p className="text-xs text-slate-500 mt-1">Relationships Mapped</p>
-        </div>
-        <div className="card-compact text-center">
-          <p className="text-2xl font-bold text-white">6</p>
-          <p className="text-xs text-slate-500 mt-1">Concept Categories</p>
+          <p className="text-2xl font-bold text-white">{landscapeData?.edges.length || 0}</p>
+          <p className="text-xs text-slate-500 mt-1">Связей</p>
         </div>
         <div className="card-compact text-center">
           <p className="text-2xl font-bold text-blue-400">
-            {selectedNode ? selectedNode.label : "None selected"}
+            {selectedNode ? selectedNode.label : "Не выбрано"}
           </p>
           <p className="text-xs text-slate-500 mt-1">
-            {selectedNode ? `Type: ${selectedNode.type}` : "Click a node to inspect"}
+            {selectedNode ? `Тип: ${selectedNode.type}` : "Нажмите на узел"}
           </p>
         </div>
       </div>

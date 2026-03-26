@@ -8,6 +8,7 @@ class SignalResponse(BaseModel):
     id: UUID
     title: str
     description: str | None = None
+    cluster: str | None = None
     signal_type: str
     novelty_score: float
     momentum_score: float

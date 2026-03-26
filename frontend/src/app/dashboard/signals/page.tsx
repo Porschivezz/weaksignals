@@ -3,10 +3,10 @@
 import { useState, useEffect, useCallback } from "react";
 import { Filter, X, ChevronDown } from "lucide-react";
 import type { TenantSignal, Signal } from "@/lib/types";
+import { CLUSTER_NAMES, SIGNAL_TYPE_LABELS } from "@/lib/types";
 import { getSignals, dismissSignal } from "@/lib/api";
 import SignalCard from "@/components/SignalCard";
 import ScoreBar from "@/components/ScoreBar";
-import TrendSparkline from "@/components/TrendSparkline";
 import {
   LineChart,
   Line,
@@ -17,249 +17,6 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-const MOCK_SIGNALS: TenantSignal[] = [
-  {
-    signal: {
-      id: "sig-001",
-      title: "Autonomous AI Agent Frameworks Proliferating",
-      description:
-        "Multiple open-source frameworks for building autonomous AI agents have emerged in the past quarter. Key players include major tech companies and well-funded startups, signaling a paradigm shift from single-query LLM interactions to persistent, goal-oriented AI systems capable of multi-step reasoning and tool use.",
-      signal_type: "strong_signal",
-      novelty_score: 0.82,
-      momentum_score: 0.91,
-      composite_score: 0.88,
-      confidence_level: 0.85,
-      time_horizon: "short_term",
-      impact_domains: ["Enterprise Software", "Automation", "Developer Tools"],
-      evidence_ids: ["ev-101", "ev-102", "ev-103"],
-      first_detected: "2026-01-15T08:00:00Z",
-      last_updated: "2026-03-20T14:30:00Z",
-      status: "active",
-    },
-    relevance_score: 0.94,
-    industry_relevance: 0.88,
-    competitor_activity: 0.79,
-    opportunity_score: 0.91,
-    is_dismissed: false,
-  },
-  {
-    signal: {
-      id: "sig-002",
-      title: "Edge AI Inference Costs Dropping Below Cloud Threshold",
-      description:
-        "New custom silicon and optimized model architectures are making on-device AI inference cost-competitive with cloud-based solutions for an expanding range of use cases. This trend could fundamentally reshape the economics of AI deployment and data sovereignty strategies.",
-      signal_type: "emerging_trend",
-      novelty_score: 0.75,
-      momentum_score: 0.68,
-      composite_score: 0.72,
-      confidence_level: 0.71,
-      time_horizon: "medium_term",
-      impact_domains: ["Hardware", "Cloud Infrastructure", "IoT"],
-      evidence_ids: ["ev-201", "ev-202"],
-      first_detected: "2026-02-01T10:00:00Z",
-      last_updated: "2026-03-18T09:15:00Z",
-      status: "active",
-    },
-    relevance_score: 0.76,
-    industry_relevance: 0.69,
-    competitor_activity: 0.55,
-    opportunity_score: 0.73,
-    is_dismissed: false,
-  },
-  {
-    signal: {
-      id: "sig-003",
-      title: "Photonic Computing for Transformer Inference",
-      description:
-        "Two independent research groups have published promising results using photonic processors for transformer model inference, achieving 10x energy efficiency improvements. While still at lab stage, this could disrupt the GPU-dominated AI infrastructure market within 3-5 years.",
-      signal_type: "weak_signal",
-      novelty_score: 0.95,
-      momentum_score: 0.35,
-      composite_score: 0.58,
-      confidence_level: 0.42,
-      time_horizon: "long_term",
-      impact_domains: ["Semiconductors", "AI Infrastructure", "Energy"],
-      evidence_ids: ["ev-301"],
-      first_detected: "2026-03-05T16:00:00Z",
-      last_updated: "2026-03-19T11:00:00Z",
-      status: "active",
-    },
-    relevance_score: 0.61,
-    industry_relevance: 0.54,
-    competitor_activity: 0.22,
-    opportunity_score: 0.67,
-    is_dismissed: false,
-  },
-  {
-    signal: {
-      id: "sig-004",
-      title: "Synthetic Data Quality Surpassing Real-World Datasets",
-      description:
-        "Leading AI labs report that models trained on carefully curated synthetic datasets are outperforming those trained on equivalent real-world data for specific domains. This development reduces data acquisition costs and addresses privacy concerns simultaneously.",
-      signal_type: "emerging_trend",
-      novelty_score: 0.7,
-      momentum_score: 0.78,
-      composite_score: 0.75,
-      confidence_level: 0.68,
-      time_horizon: "short_term",
-      impact_domains: ["Data Engineering", "Privacy", "Model Training"],
-      evidence_ids: ["ev-401", "ev-402"],
-      first_detected: "2026-01-20T12:00:00Z",
-      last_updated: "2026-03-21T08:45:00Z",
-      status: "active",
-    },
-    relevance_score: 0.81,
-    industry_relevance: 0.77,
-    competitor_activity: 0.63,
-    opportunity_score: 0.79,
-    is_dismissed: false,
-  },
-  {
-    signal: {
-      id: "sig-005",
-      title: "EU AI Act Compliance Tooling Market Explosion",
-      description:
-        "The approaching enforcement deadlines for the EU AI Act have triggered a surge of compliance tooling startups. Over 40 new tools launched in Q1 2026, creating both a crowded market and significant enterprise demand for integrated governance solutions.",
-      signal_type: "strong_signal",
-      novelty_score: 0.55,
-      momentum_score: 0.89,
-      composite_score: 0.78,
-      confidence_level: 0.82,
-      time_horizon: "immediate",
-      impact_domains: ["Regulatory", "GovTech", "Enterprise Software"],
-      evidence_ids: ["ev-501", "ev-502", "ev-503", "ev-504"],
-      first_detected: "2025-11-10T09:00:00Z",
-      last_updated: "2026-03-22T16:00:00Z",
-      status: "active",
-    },
-    relevance_score: 0.85,
-    industry_relevance: 0.82,
-    competitor_activity: 0.88,
-    opportunity_score: 0.72,
-    is_dismissed: false,
-  },
-  {
-    signal: {
-      id: "sig-006",
-      title: "Mixture-of-Experts Models Becoming Default Architecture",
-      description:
-        "Sparse Mixture-of-Experts architectures are becoming the standard for frontier models, offering better performance per compute dollar. This shift is driving changes in training infrastructure requirements and deployment strategies across the industry.",
-      signal_type: "emerging_trend",
-      novelty_score: 0.62,
-      momentum_score: 0.84,
-      composite_score: 0.74,
-      confidence_level: 0.79,
-      time_horizon: "short_term",
-      impact_domains: ["AI Research", "Cloud Infrastructure", "Model Architecture"],
-      evidence_ids: ["ev-601", "ev-602"],
-      first_detected: "2025-12-01T14:00:00Z",
-      last_updated: "2026-03-19T10:30:00Z",
-      status: "active",
-    },
-    relevance_score: 0.78,
-    industry_relevance: 0.73,
-    competitor_activity: 0.71,
-    opportunity_score: 0.68,
-    is_dismissed: false,
-  },
-  {
-    signal: {
-      id: "sig-007",
-      title: "Neuromorphic Computing Startup Funding Wave",
-      description:
-        "Three neuromorphic computing startups raised Series B rounds exceeding $100M each in Q1 2026. Institutional investors are betting on brain-inspired computing as a complementary paradigm to traditional GPU-based AI acceleration.",
-      signal_type: "weak_signal",
-      novelty_score: 0.88,
-      momentum_score: 0.45,
-      composite_score: 0.62,
-      confidence_level: 0.51,
-      time_horizon: "long_term",
-      impact_domains: ["Semiconductors", "VC/Investment", "AI Hardware"],
-      evidence_ids: ["ev-701"],
-      first_detected: "2026-02-15T11:00:00Z",
-      last_updated: "2026-03-17T14:20:00Z",
-      status: "active",
-    },
-    relevance_score: 0.56,
-    industry_relevance: 0.48,
-    competitor_activity: 0.31,
-    opportunity_score: 0.59,
-    is_dismissed: false,
-  },
-  {
-    signal: {
-      id: "sig-008",
-      title: "Cross-Industry AI Safety Consortium Forming",
-      description:
-        "Major technology companies, financial institutions, and healthcare organizations are establishing a cross-industry consortium focused on AI safety standards and shared evaluation benchmarks, suggesting the industry is moving toward self-regulation ahead of legislation.",
-      signal_type: "emerging_trend",
-      novelty_score: 0.58,
-      momentum_score: 0.72,
-      composite_score: 0.66,
-      confidence_level: 0.74,
-      time_horizon: "medium_term",
-      impact_domains: ["AI Safety", "Regulatory", "Industry Collaboration"],
-      evidence_ids: ["ev-801", "ev-802"],
-      first_detected: "2026-01-28T09:30:00Z",
-      last_updated: "2026-03-20T12:00:00Z",
-      status: "active",
-    },
-    relevance_score: 0.71,
-    industry_relevance: 0.66,
-    competitor_activity: 0.58,
-    opportunity_score: 0.63,
-    is_dismissed: false,
-  },
-  {
-    signal: {
-      id: "sig-009",
-      title: "Real-Time Multimodal Reasoning in Production",
-      description:
-        "Several production systems now demonstrate real-time multimodal reasoning combining vision, audio, and text understanding in unified inference passes. Latency improvements enable interactive applications previously considered impractical.",
-      signal_type: "strong_signal",
-      novelty_score: 0.72,
-      momentum_score: 0.85,
-      composite_score: 0.8,
-      confidence_level: 0.78,
-      time_horizon: "immediate",
-      impact_domains: ["Computer Vision", "NLP", "Product Design"],
-      evidence_ids: ["ev-901", "ev-902"],
-      first_detected: "2026-02-10T08:00:00Z",
-      last_updated: "2026-03-22T10:00:00Z",
-      status: "active",
-    },
-    relevance_score: 0.87,
-    industry_relevance: 0.81,
-    competitor_activity: 0.76,
-    opportunity_score: 0.84,
-    is_dismissed: false,
-  },
-  {
-    signal: {
-      id: "sig-010",
-      title: "Biological Neural Network Interfaces for AI Training",
-      description:
-        "University researchers demonstrated using organoid neural networks as co-processors for specific AI training tasks. While highly experimental, the approach shows unexpected efficiency gains in pattern recognition training.",
-      signal_type: "weak_signal",
-      novelty_score: 0.98,
-      momentum_score: 0.15,
-      composite_score: 0.45,
-      confidence_level: 0.28,
-      time_horizon: "long_term",
-      impact_domains: ["Biotech", "AI Research", "Ethics"],
-      evidence_ids: ["ev-1001"],
-      first_detected: "2026-03-10T14:00:00Z",
-      last_updated: "2026-03-18T16:30:00Z",
-      status: "active",
-    },
-    relevance_score: 0.38,
-    industry_relevance: 0.25,
-    competitor_activity: 0.08,
-    opportunity_score: 0.42,
-    is_dismissed: false,
-  },
-];
-
 function generateTrajectory(signal: Signal): { date: string; score: number }[] {
   const points = [];
   const base = signal.composite_score * 0.5;
@@ -269,7 +26,7 @@ function generateTrajectory(signal: Signal): { date: string; score: number }[] {
     const noise = (Math.random() - 0.4) * 0.1;
     const growth = (6 - i) * (signal.momentum_score * 0.08);
     points.push({
-      date: d.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      date: d.toLocaleDateString("ru-RU", { month: "short", day: "numeric" }),
       score: Math.min(1, Math.max(0, base + growth + noise)),
     });
   }
@@ -277,53 +34,43 @@ function generateTrajectory(signal: Signal): { date: string; score: number }[] {
 }
 
 export default function SignalsPage() {
-  const [signals, setSignals] = useState<TenantSignal[]>(MOCK_SIGNALS);
+  const [signals, setSignals] = useState<TenantSignal[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState<string>("all");
+  const [filterCluster, setFilterCluster] = useState<string>("all");
   const [minScore, setMinScore] = useState(0);
-  const [timeRange, setTimeRange] = useState<string>("All");
+  const [timeRange, setTimeRange] = useState<string>("all");
   const [selectedSignal, setSelectedSignal] = useState<TenantSignal | null>(null);
   const [showFilters, setShowFilters] = useState(true);
 
   useEffect(() => {
     async function fetchSignals() {
       try {
-        const params: Record<string, string | number> = { limit: 50 };
-        if (filterType !== "all") params.signal_type = filterType;
+        setLoading(true);
+        const params: Record<string, string | number> = { limit: 100 };
+        if (filterType !== "all") params.category = filterType;
+        if (filterCluster !== "all") params.cluster = filterCluster;
         if (minScore > 0) params.min_score = minScore;
+        if (timeRange !== "all") params.time_range = timeRange;
         const data = await getSignals(params);
-        if (data && data.length > 0) {
-          setSignals(data);
-        }
+        setSignals(data);
       } catch {
-        // Use mock data
+        // No data
+      } finally {
+        setLoading(false);
       }
     }
     fetchSignals();
-  }, [filterType, minScore]);
-
-  const filteredSignals = signals.filter((ts) => {
-    if (filterType !== "all" && ts.signal.signal_type !== filterType) return false;
-    if (ts.signal.composite_score < minScore) return false;
-    if (ts.is_dismissed) return false;
-    if (timeRange !== "All") {
-      const days = parseInt(timeRange);
-      const cutoff = new Date();
-      cutoff.setDate(cutoff.getDate() - days);
-      if (new Date(ts.signal.first_detected) < cutoff) return false;
-    }
-    return true;
-  });
+  }, [filterType, filterCluster, minScore, timeRange]);
 
   const handleDismiss = useCallback(async (id: string) => {
     try {
       await dismissSignal(id);
     } catch {
-      // Dismiss locally on API failure
+      // Dismiss locally
     }
     setSignals((prev) =>
-      prev.map((ts) =>
-        ts.signal.id === id ? { ...ts, is_dismissed: true } : ts
-      )
+      prev.filter((ts) => ts.signal.id !== id)
     );
     if (selectedSignal?.signal.id === id) setSelectedSignal(null);
   }, [selectedSignal]);
@@ -335,9 +82,9 @@ export default function SignalsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Signal Intelligence</h1>
+          <h1 className="text-2xl font-bold text-white">Аналитика сигналов</h1>
           <p className="text-sm text-slate-500 mt-1">
-            {filteredSignals.length} active signals detected across monitored sources
+            {loading ? "Загрузка..." : `${signals.length} активных сигналов`}
           </p>
         </div>
         <button
@@ -345,18 +92,18 @@ export default function SignalsPage() {
           className="btn-secondary"
         >
           <Filter className="w-4 h-4 mr-2" />
-          Filters
+          Фильтры
         </button>
       </div>
 
       {/* Filters */}
       {showFilters && (
         <div className="card animate-slide-up">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             {/* Signal type */}
             <div>
               <label className="block text-xs font-medium text-slate-400 mb-2 uppercase tracking-wider">
-                Signal Type
+                Тип сигнала
               </label>
               <div className="relative">
                 <select
@@ -364,10 +111,30 @@ export default function SignalsPage() {
                   onChange={(e) => setFilterType(e.target.value)}
                   className="input-field appearance-none pr-10"
                 >
-                  <option value="all">All Types</option>
-                  <option value="weak_signal">Weak Signals</option>
-                  <option value="emerging_trend">Emerging Trends</option>
-                  <option value="strong_signal">Strong Signals</option>
+                  <option value="all">Все типы</option>
+                  <option value="weak_signal">Слабые сигналы</option>
+                  <option value="emerging_trend">Зарождающиеся тренды</option>
+                  <option value="strong_signal">Сильные сигналы</option>
+                </select>
+                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
+              </div>
+            </div>
+
+            {/* Cluster */}
+            <div>
+              <label className="block text-xs font-medium text-slate-400 mb-2 uppercase tracking-wider">
+                Кластер
+              </label>
+              <div className="relative">
+                <select
+                  value={filterCluster}
+                  onChange={(e) => setFilterCluster(e.target.value)}
+                  className="input-field appearance-none pr-10"
+                >
+                  <option value="all">Все кластеры</option>
+                  {Object.entries(CLUSTER_NAMES).map(([key, name]) => (
+                    <option key={key} value={key}>{name}</option>
+                  ))}
                 </select>
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />
               </div>
@@ -376,7 +143,7 @@ export default function SignalsPage() {
             {/* Min score slider */}
             <div>
               <label className="block text-xs font-medium text-slate-400 mb-2 uppercase tracking-wider">
-                Minimum Score: {(minScore * 100).toFixed(0)}%
+                Минимальный балл: {(minScore * 100).toFixed(0)}%
               </label>
               <input
                 type="range"
@@ -394,24 +161,28 @@ export default function SignalsPage() {
               </div>
             </div>
 
-            {/* Time range presets */}
+            {/* Time range */}
             <div>
               <label className="block text-xs font-medium text-slate-400 mb-2 uppercase tracking-wider">
-                Time Range
+                Период
               </label>
-              <div className="flex gap-2">
-                {["7d", "30d", "90d", "All"].map((range) => (
+              <div className="flex gap-2 flex-wrap">
+                {[
+                  { key: "7d", label: "7д" },
+                  { key: "30d", label: "30д" },
+                  { key: "90d", label: "90д" },
+                  { key: "all", label: "Все" },
+                ].map((range) => (
                   <button
-                    key={range}
-                    onClick={() => setTimeRange(range === "All" ? "All" : range.replace("d", ""))}
+                    key={range.key}
+                    onClick={() => setTimeRange(range.key)}
                     className={`text-xs px-3 py-1.5 border rounded-lg transition-colors ${
-                      (timeRange === "All" && range === "All") ||
-                      timeRange === range.replace("d", "")
+                      timeRange === range.key
                         ? "border-blue-500 text-blue-400 bg-blue-500/10"
                         : "btn-ghost border-slate-700"
                     }`}
                   >
-                    {range}
+                    {range.label}
                   </button>
                 ))}
               </div>
@@ -423,8 +194,8 @@ export default function SignalsPage() {
       {/* Content area */}
       <div className="flex gap-6">
         {/* Signal grid */}
-        <div className={`flex-1 grid gap-4 ${selectedSignal ? "grid-cols-1 lg:grid-cols-2" : "grid-cols-1 md:grid-cols-2 xl:grid-cols-3"}`}>
-          {filteredSignals.map((ts) => (
+        <div className={`flex-1 grid gap-4 ${selectedSignal ? "grid-cols-1 lg:grid-cols-1" : "grid-cols-1 md:grid-cols-2 xl:grid-cols-3"}`}>
+          {signals.map((ts) => (
             <SignalCard
               key={ts.signal.id}
               tenantSignal={ts}
@@ -432,18 +203,26 @@ export default function SignalsPage() {
               onClick={() => setSelectedSignal(ts)}
             />
           ))}
-          {filteredSignals.length === 0 && (
+          {!loading && signals.length === 0 && (
             <div className="col-span-full text-center py-16">
-              <p className="text-slate-500 text-sm">No signals match your current filters.</p>
+              <p className="text-slate-500 text-sm">Нет сигналов по текущим фильтрам.</p>
               <button
                 onClick={() => {
                   setFilterType("all");
+                  setFilterCluster("all");
                   setMinScore(0);
+                  setTimeRange("all");
                 }}
                 className="btn-ghost mt-3"
               >
-                Clear filters
+                Сбросить фильтры
               </button>
+            </div>
+          )}
+          {loading && (
+            <div className="col-span-full text-center py-16">
+              <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+              <p className="text-slate-500 text-sm">Загрузка сигналов...</p>
             </div>
           )}
         </div>
@@ -453,7 +232,7 @@ export default function SignalsPage() {
           <div className="hidden xl:block w-[420px] shrink-0">
             <div className="card sticky top-8 animate-slide-right">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold text-slate-300">Signal Detail</h3>
+                <h3 className="text-sm font-semibold text-slate-300">Детали сигнала</h3>
                 <button
                   onClick={() => setSelectedSignal(null)}
                   className="text-slate-500 hover:text-slate-300 transition-colors"
@@ -466,14 +245,22 @@ export default function SignalsPage() {
                 {selectedSignal.signal.title}
               </h2>
 
-              <p className="text-sm text-slate-400 leading-relaxed mb-6">
-                {selectedSignal.signal.description}
-              </p>
+              {selectedSignal.signal.cluster && (
+                <span className="inline-block badge bg-slate-800 text-slate-400 border-slate-700 mb-3">
+                  {CLUSTER_NAMES[selectedSignal.signal.cluster] || selectedSignal.signal.cluster}
+                </span>
+              )}
+
+              {selectedSignal.signal.description && (
+                <p className="text-sm text-slate-400 leading-relaxed mb-6">
+                  {selectedSignal.signal.description}
+                </p>
+              )}
 
               {/* Trajectory chart */}
               <div className="mb-6">
                 <h4 className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-3">
-                  Score Trajectory (7 weeks)
+                  Траектория (7 недель)
                 </h4>
                 <div className="h-48 bg-slate-800/50 rounded-lg p-2">
                   <ResponsiveContainer width="100%" height="100%">
@@ -500,7 +287,7 @@ export default function SignalsPage() {
                         }}
                         formatter={(value: number) => [
                           `${(value * 100).toFixed(1)}%`,
-                          "Score",
+                          "Балл",
                         ]}
                       />
                       <Line
@@ -518,37 +305,31 @@ export default function SignalsPage() {
 
               {/* Scores */}
               <div className="space-y-3 mb-6">
-                <ScoreBar label="Novelty" value={selectedSignal.signal.novelty_score} color="cyan" />
-                <ScoreBar label="Momentum" value={selectedSignal.signal.momentum_score} color="blue" />
-                <ScoreBar label="Relevance" value={selectedSignal.relevance_score} color="amber" />
-                <ScoreBar label="Competitor Activity" value={selectedSignal.competitor_activity} color="red" />
-                <ScoreBar label="Opportunity" value={selectedSignal.opportunity_score} color="emerald" />
+                <ScoreBar label="Новизна" value={selectedSignal.signal.novelty_score} color="cyan" />
+                <ScoreBar label="Импульс" value={selectedSignal.signal.momentum_score} color="blue" />
+                <ScoreBar label="Релевантность" value={selectedSignal.relevance_score} color="amber" />
+                <ScoreBar label="Конкуренты" value={selectedSignal.competitor_activity} color="red" />
+                <ScoreBar label="Возможность" value={selectedSignal.opportunity_score} color="emerald" />
               </div>
 
               {/* Meta */}
               <div className="space-y-2 text-xs text-slate-500 border-t border-slate-800 pt-4">
                 <div className="flex justify-between">
-                  <span>First detected</span>
+                  <span>Обнаружен</span>
                   <span className="text-slate-400">
-                    {new Date(selectedSignal.signal.first_detected).toLocaleDateString()}
+                    {new Date(selectedSignal.signal.first_detected).toLocaleDateString("ru-RU")}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Last updated</span>
+                  <span>Обновлен</span>
                   <span className="text-slate-400">
-                    {new Date(selectedSignal.signal.last_updated).toLocaleDateString()}
+                    {new Date(selectedSignal.signal.last_updated).toLocaleDateString("ru-RU")}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Confidence</span>
+                  <span>Уверенность</span>
                   <span className="text-slate-400">
                     {(selectedSignal.signal.confidence_level * 100).toFixed(0)}%
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Evidence sources</span>
-                  <span className="text-slate-400">
-                    {selectedSignal.signal.evidence_ids.length}
                   </span>
                 </div>
               </div>
@@ -559,20 +340,7 @@ export default function SignalsPage() {
                   onClick={() => handleDismiss(selectedSignal.signal.id)}
                   className="btn-secondary flex-1 text-xs"
                 >
-                  Dismiss
-                </button>
-                <button
-                  onClick={async () => {
-                    try {
-                      const { addToWatchlist } = await import("@/lib/api");
-                      await addToWatchlist(selectedSignal.signal.title);
-                    } catch {
-                      // Silently handle - watchlist page will show it when API is available
-                    }
-                  }}
-                  className="btn-primary flex-1 text-xs"
-                >
-                  Add to Watchlist
+                  Скрыть
                 </button>
               </div>
             </div>
