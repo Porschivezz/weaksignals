@@ -8,12 +8,14 @@ from sqlalchemy.orm import selectinload
 
 from app.auth import get_current_user
 from app.database import get_db
+from app.models.document import Document
 from app.models.signal import Signal, SignalStatus, SignalType, TenantSignal
 from app.models.user import User, UserRole
 from app.schemas.signal import (
     SignalResponse,
     SignalTrajectory,
     SignalTrajectoryPoint,
+    SourceDocumentResponse,
     TenantSignalResponse,
 )
 
@@ -182,6 +184,97 @@ async def get_signal_trajectory(
             )
 
     return SignalTrajectory(signal_id=signal.id, title=signal.title, points=points)
+
+
+def _build_source_url(source: str, external_id: str | None, metadata: dict | None) -> str | None:
+    """Build a URL to the original source document."""
+    if not external_id:
+        return None
+    if source == "pubmed":
+        # external_id format: "pmid:12345678"
+        pmid = external_id.replace("pmid:", "")
+        return f"https://pubmed.ncbi.nlm.nih.gov/{pmid}/"
+    elif source == "arxiv":
+        # external_id format: "arxiv:2301.12345"
+        arxiv_id = external_id.replace("arxiv:", "")
+        return f"https://arxiv.org/abs/{arxiv_id}"
+    elif source == "clinicaltrials":
+        # external_id format: "nct:NCT12345678"
+        nct_id = external_id.replace("nct:", "")
+        return f"https://clinicaltrials.gov/study/{nct_id}"
+    elif source == "openalex":
+        # Try DOI from metadata first
+        if metadata and metadata.get("doi"):
+            doi = metadata["doi"]
+            if not doi.startswith("http"):
+                doi = f"https://doi.org/{doi}"
+            return doi
+        # external_id is the full OpenAlex ID like "https://openalex.org/W12345"
+        if external_id.startswith("http"):
+            return external_id
+        return f"https://openalex.org/works/{external_id}"
+    elif source == "rss":
+        # RSS stores URL in metadata
+        if metadata and metadata.get("url"):
+            return metadata["url"]
+        if metadata and metadata.get("link"):
+            return metadata["link"]
+    return None
+
+
+@router.get("/{signal_id}/sources", response_model=list[SourceDocumentResponse])
+async def get_signal_sources(
+    signal_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Get source documents that contributed to this signal."""
+    # Verify signal belongs to tenant
+    stmt = select(TenantSignal).where(
+        and_(
+            TenantSignal.signal_id == signal_id,
+            TenantSignal.tenant_id == current_user.tenant_id,
+        )
+    )
+    result = await db.execute(stmt)
+    if result.scalar_one_or_none() is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Signal not found for this tenant",
+        )
+
+    # Get the signal's evidence_ids
+    signal_result = await db.execute(select(Signal).where(Signal.id == signal_id))
+    signal = signal_result.scalar_one()
+
+    if not signal.evidence_ids:
+        return []
+
+    # Fetch documents by IDs
+    doc_result = await db.execute(
+        select(Document).where(Document.id.in_(signal.evidence_ids))
+    )
+    documents = doc_result.scalars().all()
+
+    # Build response with URLs
+    response = []
+    for doc in documents:
+        source_str = doc.source.value if doc.source else "unknown"
+        url = _build_source_url(source_str, doc.external_id, doc.metadata_)
+        response.append(
+            SourceDocumentResponse(
+                id=doc.id,
+                external_id=doc.external_id,
+                source=source_str,
+                title=doc.title,
+                abstract=doc.abstract,
+                authors=doc.authors,
+                published_date=doc.published_date,
+                url=url,
+            )
+        )
+
+    return response
 
 
 @router.post("/{signal_id}/dismiss", status_code=status.HTTP_204_NO_CONTENT)

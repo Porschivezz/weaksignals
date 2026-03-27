@@ -324,6 +324,7 @@ def analyze_and_score_task(self) -> dict:
                 batch_size = 15
                 for i in range(0, len(docs_list), batch_size):
                     batch = docs_list[i:i + batch_size]
+                    batch_ids = [str(d.id) for d in batch]
                     doc_dicts = [
                         {
                             "title": d.title,
@@ -334,6 +335,14 @@ def analyze_and_score_task(self) -> dict:
                     ]
                     try:
                         signals = await analyzer.analyze_documents(doc_dicts)
+                        # Map source_doc_indices to actual document UUIDs
+                        for sig in signals:
+                            indices = sig.get("source_doc_indices", [])
+                            doc_uuids = []
+                            for idx in indices:
+                                if isinstance(idx, int) and 0 <= idx < len(batch_ids):
+                                    doc_uuids.append(batch_ids[idx])
+                            sig["_evidence_ids"] = doc_uuids
                         all_sig.extend(signals)
                     except Exception as exc:
                         logger.error("Gemini analysis failed for batch %d: %s", i, exc)
@@ -381,11 +390,18 @@ def analyze_and_score_task(self) -> dict:
                 select(Signal).where(Signal.title == title)
             ).scalar_one_or_none()
 
+            # Get evidence document UUIDs from batch mapping
+            evidence_uuids = sig_data.get("_evidence_ids", [])
+
             if existing:
                 existing.novelty_score = max(existing.novelty_score, novelty)
                 existing.momentum_score = max(existing.momentum_score, momentum)
                 existing.composite_score = composite.composite
                 existing.last_updated = datetime.now(timezone.utc)
+                # Append new evidence_ids to existing ones
+                old_ids = existing.evidence_ids or []
+                merged = list(set(str(x) for x in old_ids) | set(evidence_uuids))
+                existing.evidence_ids = [uuid.UUID(x) for x in merged] if merged else None
                 signals_updated += 1
             else:
                 signal = Signal(
@@ -400,6 +416,7 @@ def analyze_and_score_task(self) -> dict:
                     confidence_level=relevance,
                     time_horizon=sig_data.get("time_horizon", "medium"),
                     impact_domains=sig_data.get("impact_domains", []),
+                    evidence_ids=[uuid.UUID(x) for x in evidence_uuids] if evidence_uuids else None,
                     status=SignalStatus.active,
                 )
                 session.add(signal)

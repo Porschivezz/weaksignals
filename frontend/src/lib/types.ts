@@ -112,6 +112,25 @@ export interface AISummary {
   opportunities: string[];
 }
 
+export interface SourceDocument {
+  id: string;
+  external_id: string | null;
+  source: string;
+  title: string;
+  abstract: string | null;
+  authors: Record<string, unknown> | unknown[] | null;
+  published_date: string | null;
+  url: string | null;
+}
+
+export const SOURCE_LABELS: Record<string, string> = {
+  pubmed: "PubMed",
+  openalex: "OpenAlex",
+  arxiv: "arXiv",
+  clinicaltrials: "ClinicalTrials.gov",
+  rss: "Новости",
+};
+
 export const CLUSTER_NAMES: Record<string, string> = {
   ai_drug_discovery: "AI в разработке лекарств",
   oncology: "Онкология нового поколения",

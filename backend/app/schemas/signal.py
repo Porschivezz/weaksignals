@@ -51,6 +51,19 @@ class TenantSignalResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class SourceDocumentResponse(BaseModel):
+    id: UUID
+    external_id: str | None = None
+    source: str
+    title: str
+    abstract: str | None = None
+    authors: dict | list | None = None
+    published_date: datetime | None = None
+    url: str | None = None
+
+    model_config = {"from_attributes": True}
+
+
 class SignalTrajectoryPoint(BaseModel):
     timestamp: datetime
     metric_name: str

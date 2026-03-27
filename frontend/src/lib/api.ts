@@ -7,6 +7,7 @@ import type {
   WeeklyDigest,
   Tenant,
   User,
+  SourceDocument,
 } from "./types";
 
 const BASE_URL =
@@ -93,6 +94,11 @@ export async function addToWatchlist(technology: string): Promise<void> {
 
 export async function removeFromWatchlist(technology: string): Promise<void> {
   await api.delete(`/tenant/watchlist/${encodeURIComponent(technology)}`);
+}
+
+export async function getSignalSources(signalId: string): Promise<SourceDocument[]> {
+  const response = await api.get(`/signals/${signalId}/sources`);
+  return response.data;
 }
 
 export async function dismissSignal(signalId: string): Promise<void> {
