@@ -8,6 +8,7 @@ import type {
   Tenant,
   User,
   SourceDocument,
+  PipelineProgress,
 } from "./types";
 
 const BASE_URL =
@@ -124,6 +125,11 @@ export async function triggerIngestion(): Promise<{ status: string; task_id: str
 
 export async function triggerAnalysis(): Promise<{ status: string; task_id: string; message: string }> {
   const response = await api.post("/pipeline/trigger-analysis");
+  return response.data;
+}
+
+export async function getPipelineProgress(taskId: string): Promise<PipelineProgress> {
+  const response = await api.get(`/pipeline/progress/${taskId}`);
   return response.data;
 }
 

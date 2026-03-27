@@ -14,10 +14,11 @@ import {
   LogOut,
   Radar,
   Play,
+  Loader2,
 } from "lucide-react";
 import Cookies from "js-cookie";
 import { useRouter } from "next/navigation";
-import { triggerIngestion } from "@/lib/api";
+import { usePipeline } from "@/lib/pipeline-context";
 
 const navItems = [
   { href: "/dashboard", label: "Обзор", icon: LayoutDashboard },
@@ -39,9 +40,9 @@ export default function Sidebar({
   userRole = "user",
 }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
-  const [pipelineLoading, setPipelineLoading] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
+  const { isRunning, startPipeline, showProgress, setShowProgress } = usePipeline();
 
   const isActive = (href: string) => {
     if (href === "/dashboard") return pathname === "/dashboard";
@@ -55,14 +56,12 @@ export default function Sidebar({
   };
 
   const handleTriggerPipeline = async () => {
-    setPipelineLoading(true);
-    try {
-      await triggerIngestion();
-    } catch {
-      // Pipeline trigger may fail silently
-    } finally {
-      setPipelineLoading(false);
+    if (isRunning) {
+      // If already running, just show the progress panel
+      setShowProgress(true);
+      return;
     }
+    await startPipeline();
   };
 
   const canTrigger = userRole === "ceo" || userRole === "admin";
@@ -115,13 +114,25 @@ export default function Sidebar({
         {canTrigger && (
           <button
             onClick={handleTriggerPipeline}
-            disabled={pipelineLoading}
-            className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 text-emerald-400 hover:bg-emerald-500/10 border border-transparent hover:border-emerald-500/20 disabled:opacity-50"
+            disabled={false}
+            className={`flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 border ${
+              isRunning
+                ? "text-blue-400 bg-blue-500/10 border-blue-500/20"
+                : "text-emerald-400 hover:bg-emerald-500/10 border-transparent hover:border-emerald-500/20"
+            }`}
           >
-            <Play className={`w-5 h-5 shrink-0 ${pipelineLoading ? "animate-pulse" : ""}`} />
+            {isRunning ? (
+              <Loader2 className="w-5 h-5 shrink-0 animate-spin" />
+            ) : (
+              <Play className="w-5 h-5 shrink-0" />
+            )}
             {!collapsed && (
               <span className="truncate">
-                {pipelineLoading ? "Запуск..." : "Запустить сбор"}
+                {isRunning
+                  ? showProgress
+                    ? "Выполняется..."
+                    : "Показать прогресс"
+                  : "Запустить сбор"}
               </span>
             )}
           </button>

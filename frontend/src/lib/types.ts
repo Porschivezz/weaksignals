@@ -123,6 +123,34 @@ export interface SourceDocument {
   url: string | null;
 }
 
+export interface PipelineProgress {
+  task_id: string;
+  status: "running" | "completed" | "failed" | "unknown";
+  stage: "ingestion" | "analysis" | "relevance" | "done";
+  started_at: string | null;
+  completed_at: string | null;
+  error: string | null;
+  ingestion: {
+    status: string;
+    sources: Record<string, number>;
+    total_fetched: Record<string, number>;
+    total_new: number;
+    current_source: string | null;
+  };
+  analysis: {
+    status: string;
+    total_docs: number;
+    analyzed: number;
+    signals_created: number;
+    signals_updated: number;
+    error?: string;
+  };
+  relevance: {
+    status: string;
+    scored: number;
+  };
+}
+
 export const SOURCE_LABELS: Record<string, string> = {
   pubmed: "PubMed",
   openalex: "OpenAlex",

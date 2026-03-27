@@ -4,6 +4,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Cookies from "js-cookie";
 import Sidebar from "@/components/Sidebar";
+import PipelineProgress from "@/components/PipelineProgress";
+import Toast from "@/components/Toast";
+import { PipelineProvider } from "@/lib/pipeline-context";
 import type { User } from "@/lib/types";
 
 export default function DashboardLayout({
@@ -48,15 +51,19 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen bg-slate-950">
-      <Sidebar
-        tenantName="ГК Фармасинтез"
-        userName={user?.full_name || "Пользователь"}
-        userRole={user?.role || "user"}
-      />
-      <main className="pl-60 min-h-screen">
-        <div className="p-8">{children}</div>
-      </main>
-    </div>
+    <PipelineProvider>
+      <div className="min-h-screen bg-slate-950">
+        <Sidebar
+          tenantName="ГК Фармасинтез"
+          userName={user?.full_name || "Пользователь"}
+          userRole={user?.role || "user"}
+        />
+        <main className="pl-60 min-h-screen">
+          <div className="p-8">{children}</div>
+        </main>
+        <PipelineProgress />
+        <Toast />
+      </div>
+    </PipelineProvider>
   );
 }

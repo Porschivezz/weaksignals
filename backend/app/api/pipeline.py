@@ -1,4 +1,4 @@
-"""Pipeline management API — trigger ingestion, analysis, etc."""
+"""Pipeline management API — trigger ingestion, analysis, progress tracking."""
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
@@ -12,22 +12,21 @@ router = APIRouter(prefix="/pipeline", tags=["pipeline"])
 async def trigger_ingestion(
     current_user: User = Depends(get_current_user),
 ):
-    """Trigger a full ingestion + analysis pipeline run."""
+    """Trigger the full pipeline: ingestion → analysis → tenant relevance."""
     if current_user.role not in (UserRole.ceo, UserRole.admin):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only CEO or admin can trigger pipeline",
         )
 
-    from app.workers.tasks import ingest_all_sources_task, analyze_and_score_task, compute_tenant_relevance_task
+    from app.workers.tasks import run_full_pipeline_task
 
-    # Queue tasks in sequence
-    chain = ingest_all_sources_task.apply_async()
+    task = run_full_pipeline_task.apply_async()
 
     return {
         "status": "triggered",
-        "task_id": str(chain.id),
-        "message": "Ingestion pipeline started. Signals will appear within ~10 minutes.",
+        "task_id": str(task.id),
+        "message": "Полный пайплайн запущен: сбор → анализ → оценка релевантности.",
     }
 
 
@@ -50,3 +49,21 @@ async def trigger_analysis(
         "task_id": str(task.id),
         "message": "Analysis pipeline started.",
     }
+
+
+@router.get("/progress/{task_id}")
+async def get_progress(
+    task_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    """Get pipeline progress by task ID."""
+    from app.workers.tasks import get_pipeline_progress
+
+    progress = get_pipeline_progress(task_id)
+    if progress is None:
+        return {
+            "task_id": task_id,
+            "status": "unknown",
+            "error": "Задача не найдена или истекла",
+        }
+    return progress
