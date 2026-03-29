@@ -201,7 +201,7 @@ def ingest_all_sources_task(self) -> dict:
                 try:
                     docs = []
                     for query in PUBMED_QUERIES:
-                        docs.extend(await client.search_and_fetch(query, max_results=20, days_back=30))
+                        docs.extend(await client.search_and_fetch(query, max_results=20, days_back=1))
                     return docs
                 finally:
                     await client.close()
@@ -230,7 +230,7 @@ def ingest_all_sources_task(self) -> dict:
                     for query in openalex_queries:
                         docs.extend(await client.fetch_recent_works(
                             query=query, per_page=25,
-                            from_date=datetime.now(timezone.utc) - timedelta(days=30),
+                            from_date=datetime.now(timezone.utc) - timedelta(days=1),
                             max_pages=2,
                         ))
                     return docs
@@ -252,7 +252,7 @@ def ingest_all_sources_task(self) -> dict:
                 try:
                     docs = []
                     for query in CT_QUERIES:
-                        docs.extend(await client.search_studies(query, max_results=15, days_back=60))
+                        docs.extend(await client.search_studies(query, max_results=15, days_back=1))
                     return docs
                 finally:
                     await client.close()
@@ -363,13 +363,19 @@ def analyze_and_score_task(self) -> dict:
                     ]
                     try:
                         signals = await analyzer.analyze_documents(doc_dicts)
-                        # Map source_doc_indices to actual document UUIDs
+                        # Map source_doc_indices (1-indexed from LLM) to document UUIDs
                         for sig in signals:
                             indices = sig.get("source_doc_indices", [])
                             doc_uuids = []
                             for idx in indices:
-                                if isinstance(idx, int) and 0 <= idx < len(batch_ids):
-                                    doc_uuids.append(batch_ids[idx])
+                                if isinstance(idx, int):
+                                    # LLM returns 1-indexed, convert to 0-indexed
+                                    zero_idx = idx - 1 if idx >= 1 else idx
+                                    if 0 <= zero_idx < len(batch_ids):
+                                        doc_uuids.append(batch_ids[zero_idx])
+                            # If LLM didn't return indices, link all batch docs
+                            if not doc_uuids:
+                                doc_uuids = batch_ids[:]
                             sig["_evidence_ids"] = doc_uuids
                         all_sig.extend(signals)
                     except Exception as exc:
@@ -616,7 +622,7 @@ def run_full_pipeline_task(self) -> dict:
                 try:
                     docs = []
                     for query in PUBMED_QUERIES:
-                        docs.extend(await client.search_and_fetch(query, max_results=20, days_back=30))
+                        docs.extend(await client.search_and_fetch(query, max_results=20, days_back=1))
                     return docs
                 finally:
                     await client.close()
@@ -649,7 +655,7 @@ def run_full_pipeline_task(self) -> dict:
                     for query in openalex_queries:
                         docs.extend(await client.fetch_recent_works(
                             query=query, per_page=25,
-                            from_date=datetime.now(timezone.utc) - timedelta(days=30),
+                            from_date=datetime.now(timezone.utc) - timedelta(days=1),
                             max_pages=2,
                         ))
                     return docs
@@ -675,7 +681,7 @@ def run_full_pipeline_task(self) -> dict:
                 try:
                     docs = []
                     for query in CT_QUERIES:
-                        docs.extend(await client.search_studies(query, max_results=15, days_back=60))
+                        docs.extend(await client.search_studies(query, max_results=15, days_back=1))
                     return docs
                 finally:
                     await client.close()
@@ -786,8 +792,12 @@ def run_full_pipeline_task(self) -> dict:
                                     indices = sig.get("source_doc_indices", [])
                                     doc_uuids = []
                                     for idx in indices:
-                                        if isinstance(idx, int) and 0 <= idx < len(batch_ids):
-                                            doc_uuids.append(batch_ids[idx])
+                                        if isinstance(idx, int):
+                                            zero_idx = idx - 1 if idx >= 1 else idx
+                                            if 0 <= zero_idx < len(batch_ids):
+                                                doc_uuids.append(batch_ids[zero_idx])
+                                    if not doc_uuids:
+                                        doc_uuids = batch_ids[:]
                                     sig["_evidence_ids"] = doc_uuids
                                 all_sig.extend(signals)
                             except Exception as exc:

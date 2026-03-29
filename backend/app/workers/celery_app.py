@@ -32,16 +32,10 @@ celery_app.conf.update(
 )
 
 celery_app.conf.beat_schedule = {
-    "ingest-all-sources": {
-        "task": "app.workers.tasks.ingest_all_sources_task",
-        "schedule": crontab(minute=0, hour="*/6"),
-    },
-    "analyze-and-score": {
-        "task": "app.workers.tasks.analyze_and_score_task",
-        "schedule": crontab(minute=30, hour="*/6"),
-    },
-    "compute-tenant-relevance": {
-        "task": "app.workers.tasks.compute_tenant_relevance_task",
-        "schedule": crontab(minute=0, hour=3),
+    # Full pipeline daily at 06:00 UTC (09:00 MSK)
+    # Runs: ingestion → LLM analysis → tenant relevance scoring
+    "daily-full-pipeline": {
+        "task": "app.workers.tasks.run_full_pipeline_task",
+        "schedule": crontab(minute=0, hour=6),
     },
 }
