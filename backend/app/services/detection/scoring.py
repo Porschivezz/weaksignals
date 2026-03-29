@@ -3,8 +3,6 @@
 import logging
 from dataclasses import dataclass
 
-import numpy as np
-
 logger = logging.getLogger(__name__)
 
 
@@ -207,125 +205,97 @@ class SignalScorer:
         self,
         signal: dict,
         tenant_config: dict,
-        embeddings_service: object,
+        embeddings_service: object = None,
     ) -> float:
-        """Compute cosine similarity of signal embedding to tenant industry verticals.
+        """Compute relevance of signal to tenant's industry verticals.
 
-        Args:
-            signal: Signal dict with 'title' and 'description'.
-            tenant_config: Tenant config with 'industry_verticals'.
-            embeddings_service: EmbeddingService instance.
-
-        Returns:
-            Float between 0 and 1 indicating industry relevance.
+        Uses keyword matching between signal text and industry verticals.
         """
         industry_verticals = tenant_config.get("industry_verticals", [])
         if not industry_verticals:
             return 0.5  # Neutral if no industry configured
 
-        signal_text = f"{signal.get('title', '')} {signal.get('description', '')}"
+        signal_text = f"{signal.get('title', '')} {signal.get('description', '')}".lower()
         if not signal_text.strip():
             return 0.0
 
-        try:
-            signal_embedding = np.array(embeddings_service.embed_text(signal_text))
-            signal_norm = np.linalg.norm(signal_embedding)
-            if signal_norm == 0:
-                return 0.0
+        # Keyword matching against industry verticals
+        matches = 0
+        total_terms = 0
+        for vertical in industry_verticals:
+            keywords = [kw.strip().lower() for kw in vertical.split() if len(kw.strip()) > 2]
+            total_terms += len(keywords)
+            for kw in keywords:
+                if kw in signal_text:
+                    matches += 1
 
-            industry_text = " ".join(industry_verticals)
-            industry_embedding = np.array(embeddings_service.embed_text(industry_text))
-            industry_norm = np.linalg.norm(industry_embedding)
-            if industry_norm == 0:
-                return 0.0
+        if total_terms == 0:
+            return 0.5
 
-            cosine_sim = float(
-                np.dot(signal_embedding, industry_embedding)
-                / (signal_norm * industry_norm)
-            )
-            # Map from [-1, 1] to [0, 1]
-            return max(0.0, min(1.0, (cosine_sim + 1.0) / 2.0))
-        except Exception as exc:
-            logger.warning("Industry relevance computation failed: %s", exc)
-            return 0.0
+        # Normalize: even a few keyword matches indicate relevance
+        score = min(matches / max(total_terms * 0.3, 1), 1.0)
+        return round(max(0.0, min(1.0, score)), 4)
 
     @staticmethod
     def _compute_competitor_activity(signal: dict, tenant_config: dict) -> float:
-        """Check if competitors are among the signal's authors.
+        """Check if competitors are mentioned in the signal.
 
-        Args:
-            signal: Signal dict with 'authors' (list of dicts with name, institution).
-            tenant_config: Tenant config with 'competitor_list' dict containing
-                          'names' and/or 'institutions'.
-
-        Returns:
-            Float between 0 and 1 indicating competitor activity level.
+        Checks signal title, description, and authors against competitor names.
         """
         competitor_list = tenant_config.get("competitor_list") or {}
-        competitor_names = set(
-            n.lower() for n in competitor_list.get("names", [])
-        )
-        competitor_institutions = set(
-            i.lower() for i in competitor_list.get("institutions", [])
-        )
-
-        if not competitor_names and not competitor_institutions:
+        if not competitor_list:
             return 0.0
 
+        # Extract competitor names — support both formats:
+        # {"names": [...]} or {"CompanyName": {...}}
+        competitor_names = set()
+        if "names" in competitor_list:
+            competitor_names = set(n.lower() for n in competitor_list["names"])
+        else:
+            # Keys are competitor names
+            competitor_names = set(n.lower() for n in competitor_list.keys())
+
+        if not competitor_names:
+            return 0.0
+
+        # Check signal text for competitor mentions
+        signal_text = f"{signal.get('title', '')} {signal.get('description', '')}".lower()
+        text_matches = sum(1 for cn in competitor_names if cn in signal_text)
+
+        # Check authors
         authors = signal.get("authors", [])
-        if not authors:
-            return 0.0
-
-        matches = 0
-        total_checks = 0
-
+        author_matches = 0
         for author in authors:
             author_name = (author.get("name", "") or "").lower()
             author_inst = (author.get("institution", "") or "").lower()
+            if any(cn in author_name or cn in author_inst for cn in competitor_names):
+                author_matches += 1
 
-            if author_name and any(cn in author_name or author_name in cn for cn in competitor_names):
-                matches += 1
-            if author_inst and any(ci in author_inst or author_inst in ci for ci in competitor_institutions):
-                matches += 1
-            total_checks += 1
-
-        if total_checks == 0:
-            return 0.0
-
-        # Even a single competitor match is significant
-        if matches >= 3:
+        total_matches = text_matches + author_matches
+        if total_matches >= 3:
             return 1.0
-        if matches >= 1:
-            return 0.5 + (matches * 0.15)
+        if total_matches >= 1:
+            return 0.5 + (total_matches * 0.15)
         return 0.0
 
     def _compute_opportunity_score(
         self,
         signal: dict,
         tenant_config: dict,
-        embeddings_service: object,
+        embeddings_service: object = None,
     ) -> float:
         """Compute how actionable a signal is for a tenant.
 
-        Based on overlap between signal entities and tenant's technology watchlist.
-
-        Args:
-            signal: Signal dict with 'entities' (list of entity names).
-            tenant_config: Tenant config with 'technology_watchlist'.
-            embeddings_service: EmbeddingService instance.
-
-        Returns:
-            Float between 0 and 1 indicating opportunity level.
+        Based on overlap between signal text/entities and tenant's technology watchlist.
         """
         watchlist = tenant_config.get("technology_watchlist", [])
         if not watchlist:
             return 0.5  # Neutral if no watchlist
 
         signal_entities = signal.get("entities", [])
-        if not signal_entities:
-            return 0.0
+        signal_text = f"{signal.get('title', '')} {signal.get('description', '')}".lower()
 
-        # Check direct text overlap
+        # Check direct text overlap from entities
         watchlist_lower = set(w.lower() for w in watchlist)
         entity_names = [e.lower() if isinstance(e, str) else e.get("name", "").lower() for e in signal_entities]
 
@@ -336,30 +306,21 @@ class SignalScorer:
                     direct_matches += 1
                     break
 
+        # Also check watchlist keywords against signal title/description
+        text_matches = 0
+        for watch_term in watchlist_lower:
+            if watch_term in signal_text:
+                text_matches += 1
+
         if direct_matches > 0:
             direct_score = min(direct_matches / len(watchlist), 1.0)
         else:
             direct_score = 0.0
 
-        # Embedding-based similarity for non-direct matches
-        try:
-            entity_text = " ".join(entity_names)
-            watchlist_text = " ".join(watchlist)
+        if text_matches > 0:
+            text_score = min(text_matches / len(watchlist), 1.0)
+        else:
+            text_score = 0.0
 
-            entity_emb = np.array(embeddings_service.embed_text(entity_text))
-            watchlist_emb = np.array(embeddings_service.embed_text(watchlist_text))
-
-            e_norm = np.linalg.norm(entity_emb)
-            w_norm = np.linalg.norm(watchlist_emb)
-
-            if e_norm > 0 and w_norm > 0:
-                sim = float(np.dot(entity_emb, watchlist_emb) / (e_norm * w_norm))
-                embedding_score = max(0.0, min(1.0, (sim + 1.0) / 2.0))
-            else:
-                embedding_score = 0.0
-        except Exception as exc:
-            logger.warning("Opportunity embedding computation failed: %s", exc)
-            embedding_score = 0.0
-
-        # Combine direct matches (stronger signal) with embedding similarity
-        return 0.6 * direct_score + 0.4 * embedding_score
+        # Combine: direct entity matches + text matches
+        return round(max(direct_score, text_score), 4)
